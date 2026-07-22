@@ -23,8 +23,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mcp-servers/skills-manager-mcp.git"
+    "url": "git+https://github.com/AbdulqaderAhmed/skills-manager-mcp.git"
   },
+  "bugs": {
+    "url": "https://github.com/AbdulqaderAhmed/skills-manager-mcp/issues"
+  },
+  "homepage": "https://github.com/AbdulqaderAhmed/skills-manager-mcp#readme",
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
