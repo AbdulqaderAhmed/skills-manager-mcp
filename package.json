@@ -1,6 +1,6 @@
 {
   "name": "skills-manager-mcp",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Local MCP server and CLI tool to manage and automatically install AI agent skills for projects",
   "main": "dist/index.js",
   "bin": {

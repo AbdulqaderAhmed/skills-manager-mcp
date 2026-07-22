@@ -211,13 +211,13 @@ async function runTests() {
   await fs.writeFile(legacyTrackerFile, JSON.stringify(legacyData, null, 2), 'utf-8');
 
   const loadedTracker = await Tracker.loadTracker(legacyTrackerDir);
-  assert.strictEqual(loadedTracker.version, '1.5.0');
+  assert.strictEqual(loadedTracker.version, '1.5.1');
   assert.ok(loadedTracker.migrations);
   assert.strictEqual(loadedTracker.migrations['1.0'], 'completed');
-  assert.strictEqual(loadedTracker.migrations['1.5.0'], 'completed');
+  assert.strictEqual(loadedTracker.migrations['1.5.1'], 'completed');
 
   await fs.rm(legacyTrackerDir, { recursive: true, force: true }).catch(() => {});
-  console.log('✓ Test 6B: Tracker schema migration test (1.0 -> 1.5.0) passed.');
+  console.log('✓ Test 6B: Tracker schema migration test (1.0 -> 1.5.1) passed.');
 
   // -------------------------------------------------------------
   // FIRST-RUN AUTOMATIC INITIALIZATION TESTS (REQUIREMENT #6)

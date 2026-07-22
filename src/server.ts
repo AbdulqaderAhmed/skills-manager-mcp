@@ -14,7 +14,7 @@ export function createServer(): Server {
   const server = new Server(
     {
       name: 'skills-manager-mcp',
-      version: '1.5.0',
+      version: '1.5.1',
     },
     {
       capabilities: {
