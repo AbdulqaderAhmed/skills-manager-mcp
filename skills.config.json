@@ -1,0 +1,19 @@
+{
+  "skills": [
+    {
+      "name": "find-skills",
+      "repository": "https://github.com/vercel-labs/skills",
+      "skill": "find-skills"
+    },
+    {
+      "name": "frontend-design",
+      "repository": "https://github.com/anthropics/skills",
+      "skill": "frontend-design"
+    },
+    {
+      "type": "bundle",
+      "name": "mattpocock-skills",
+      "repository": "https://github.com/mattpocock/skills"
+    }
+  ]
+}
