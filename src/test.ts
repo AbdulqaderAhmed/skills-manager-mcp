@@ -23,6 +23,7 @@ import {
 } from './services/antigravityRegistry.js';
 import { performDoctorChecks } from './commands/doctor.js';
 import { Tracker } from './tracker.js';
+import { SkillManager } from './skillManager.js';
 import { isInitialized, ensureInitialized } from './services/initializer.js';
 
 async function runTests() {
@@ -211,13 +212,13 @@ async function runTests() {
   await fs.writeFile(legacyTrackerFile, JSON.stringify(legacyData, null, 2), 'utf-8');
 
   const loadedTracker = await Tracker.loadTracker(legacyTrackerDir);
-  assert.strictEqual(loadedTracker.version, '1.5.1');
+  assert.strictEqual(loadedTracker.version, '1.6.0');
   assert.ok(loadedTracker.migrations);
   assert.strictEqual(loadedTracker.migrations['1.0'], 'completed');
-  assert.strictEqual(loadedTracker.migrations['1.5.1'], 'completed');
+  assert.strictEqual(loadedTracker.migrations['1.6.0'], 'completed');
 
   await fs.rm(legacyTrackerDir, { recursive: true, force: true }).catch(() => {});
-  console.log('✓ Test 6B: Tracker schema migration test (1.0 -> 1.5.1) passed.');
+  console.log('✓ Test 6B: Tracker schema migration test (1.0 -> 1.6.0) passed.');
 
   // -------------------------------------------------------------
   // FIRST-RUN AUTOMATIC INITIALIZATION TESTS (REQUIREMENT #6)
@@ -271,6 +272,59 @@ async function runTests() {
 
   await fs.rm(freshMockDir, { recursive: true, force: true }).catch(() => {});
   console.log('✓ Test 7B: First-run auto-initialization, idempotency, and server preservation passed.');
+
+  // -------------------------------------------------------------
+  // SKILL REMOVAL TESTS (REQUIREMENT #8)
+  // -------------------------------------------------------------
+  const removeTestDir = await fs.mkdtemp(path.join(os.tmpdir(), 'remove-test-ws-'));
+  const skill1Dir = path.join(removeTestDir, '.agents', 'skills', 'dummy-skill-1');
+  const skill2Dir = path.join(removeTestDir, '.agents', 'skills', 'dummy-skill-2');
+  await fs.mkdir(skill1Dir, { recursive: true });
+  await fs.mkdir(skill2Dir, { recursive: true });
+
+  // Record in tracker
+  await Tracker.recordSkillInstallation(removeTestDir, 'dummy-skill-1', 'http://repo1', 'skill');
+  await Tracker.recordSkillInstallation(removeTestDir, 'dummy-skill-2', 'http://repo2', 'skill');
+
+  // Also record a bundle
+  await Tracker.recordSkillInstallation(removeTestDir, 'dummy-bundle', 'http://bundle-repo', 'bundle', ['dummy-skill-1']);
+
+  // Pre-seed skills.config.json
+  const initialConfig = {
+    skills: [
+      { type: 'skill', name: 'dummy-skill-1', repository: 'http://repo1' },
+      { type: 'skill', name: 'dummy-skill-2', repository: 'http://repo2' },
+    ]
+  };
+  await fs.writeFile(path.join(removeTestDir, 'skills.config.json'), JSON.stringify(initialConfig, null, 2), 'utf-8');
+
+  // Test batch removal with removeFromConfig: true
+  const removeReport = await SkillManager.removeSkills(
+    ['dummy-skill-1', 'dummy-skill-2', 'non-existent-skill'],
+    true,
+    removeTestDir
+  );
+
+  assert.strictEqual(removeReport.removed.length, 2);
+  assert.strictEqual(removeReport.notFound.length, 1);
+  assert.ok(removeReport.removed.includes('dummy-skill-1'));
+  assert.ok(removeReport.removed.includes('dummy-skill-2'));
+
+  // Assert folders are gone
+  assert.strictEqual(await fs.stat(skill1Dir).then(() => true).catch(() => false), false);
+  assert.strictEqual(await fs.stat(skill2Dir).then(() => true).catch(() => false), false);
+
+  // Assert tracker updated
+  const trackerAfterRemove = await Tracker.loadTracker(removeTestDir);
+  assert.strictEqual(trackerAfterRemove.skills['dummy-skill-1'], undefined);
+  assert.strictEqual(trackerAfterRemove.skills['dummy-skill-2'], undefined);
+
+  // Assert skills.config.json updated
+  const configAfterRemove = JSON.parse(await fs.readFile(path.join(removeTestDir, 'skills.config.json'), 'utf-8'));
+  assert.strictEqual(configAfterRemove.skills.length, 0);
+
+  await fs.rm(removeTestDir, { recursive: true, force: true }).catch(() => {});
+  console.log('✓ Test 8: Batch skill removal, tracker cleanup, and config sync passed.');
 
   // Restore env vars & cleanup temp dirs
   if (origEnvMcpWorkspace) process.env.MCP_WORKSPACE_DIR = origEnvMcpWorkspace;

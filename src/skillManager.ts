@@ -1,10 +1,12 @@
 import path from 'node:path';
 import { detectWorkspace, isServerDirectory } from './workspace.js';
 import { GlobalConfig } from './globalConfig.js';
+import { removeSkillsFromConfig } from './config.js';
 import {
   ensureSkillsDirectory,
   checkSkillExists,
   listInstalledSkillFolders,
+  removeSkillFolder,
 } from './filesystem.js';
 import { installSkill } from './installer.js';
 import { Tracker } from './tracker.js';
@@ -15,6 +17,8 @@ import {
   CheckMissingReport,
   BootstrapReport,
   SyncReport,
+  RemoveSkillsReport,
+  RemoveResult,
   InstallResult,
   WorkspaceDetectionResult,
 } from './types.js';
@@ -361,4 +365,108 @@ export class SkillManager {
       summary: summaryLines.join('\n').trim(),
     };
   }
+
+  /**
+   * Removes one or an array of specified skills or bundles from the project workspace.
+   *
+   * @param skillNames Array of skill or bundle names to remove
+   * @param removeFromConfig Optional. If true, also removes skills from project's skills.config.json
+   * @param projectPath Optional target project path
+   * @param clientRootPath Optional client root path from roots/list RPC
+   */
+  public static async removeSkills(
+    skillNames: string[],
+    removeFromConfig: boolean = false,
+    projectPath?: string,
+    clientRootPath?: string
+  ): Promise<RemoveSkillsReport> {
+    const wsResult = await detectWorkspace(projectPath, clientRootPath);
+    const targetDir = wsResult.workspacePath;
+    const tracker = await Tracker.loadTracker(targetDir);
+
+    const removed: string[] = [];
+    const notFound: string[] = [];
+    const failed: string[] = [];
+    const details: RemoveResult[] = [];
+
+    const summaryLines: string[] = [
+      `Skill Removal Report for: ${targetDir}`,
+      `Detection Source: ${wsResult.source}`,
+      '',
+      'Removal Details:',
+    ];
+
+    for (const nameInput of skillNames) {
+      const name = nameInput.trim();
+      if (!name) continue;
+
+      try {
+        let wasRemoved = false;
+        const trackedMetadata = tracker.skills[name];
+
+        if (trackedMetadata && trackedMetadata.type === 'bundle') {
+          // Bundle removal: remove all sub-skills associated with this bundle
+          const subSkills = trackedMetadata.installedSkills || [];
+          for (const subSkill of subSkills) {
+            await removeSkillFolder(targetDir, subSkill);
+          }
+          await Tracker.removeSkillFromTracker(targetDir, name);
+          wasRemoved = true;
+        } else {
+          // Individual skill removal (or single skill folder deletion)
+          const folderRemoved = await removeSkillFolder(targetDir, name);
+          await Tracker.removeSkillFromTracker(targetDir, name);
+          if (folderRemoved || trackedMetadata) {
+            wasRemoved = true;
+          }
+        }
+
+        if (wasRemoved) {
+          removed.push(name);
+          details.push({
+            skillName: name,
+            status: 'removed',
+            message: `Successfully removed '${name}' from project workspace.`,
+          });
+          summaryLines.push(`✓ Removed: ${name}`);
+        } else {
+          notFound.push(name);
+          details.push({
+            skillName: name,
+            status: 'not_found',
+            message: `Skill or bundle '${name}' was not found in project workspace.`,
+          });
+          summaryLines.push(`- Not Found: ${name}`);
+        }
+      } catch (err: any) {
+        failed.push(name);
+        const errMsg = err?.message || String(err);
+        details.push({
+          skillName: name,
+          status: 'failed',
+          message: `Failed to remove '${name}': ${errMsg}`,
+        });
+        summaryLines.push(`✗ Failed: ${name} (${errMsg})`);
+      }
+    }
+
+    if (removeFromConfig && skillNames.length > 0) {
+      const configUpdated = await removeSkillsFromConfig(targetDir, skillNames);
+      if (configUpdated) {
+        summaryLines.push('');
+        summaryLines.push('✓ Updated skills.config.json to prevent auto-reinstallation.');
+      }
+    }
+
+    return {
+      workspace: targetDir,
+      source: wsResult.source,
+      removed,
+      notFound,
+      failed,
+      details,
+      summary: summaryLines.join('\n').trim(),
+    };
+  }
 }
+

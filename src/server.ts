@@ -14,7 +14,7 @@ export function createServer(): Server {
   const server = new Server(
     {
       name: 'skills-manager-mcp',
-      version: '1.5.1',
+      version: '1.6.0',
     },
     {
       capabilities: {
@@ -143,6 +143,33 @@ export function createServer(): Server {
             required: [],
           },
         },
+        {
+          name: 'remove_skills',
+          description:
+            'Remove one or an array of specified skills or bundles from the project workspace (.agents/skills) and update metadata tracking.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              skills: {
+                type: 'array',
+                items: { type: 'string' },
+                description:
+                  'Array of skill or bundle names to remove.',
+              },
+              removeFromConfig: {
+                type: 'boolean',
+                description:
+                  'Optional. If true, also removes skills from project skills.config.json to prevent auto-reinstallation.',
+              },
+              projectPath: {
+                type: 'string',
+                description:
+                  'Path to the target project workspace directory. AI agents should pass the user\'s currently active project workspace directory path here.',
+              },
+            },
+            required: ['skills'],
+          },
+        },
       ],
     };
   });
@@ -150,7 +177,12 @@ export function createServer(): Server {
   // Handle tool executions
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
-    const toolArgs = (args || {}) as { projectPath?: string; configPath?: string };
+    const toolArgs = (args || {}) as {
+      projectPath?: string;
+      configPath?: string;
+      skills?: string[];
+      removeFromConfig?: boolean;
+    };
 
     // Detect active client workspace root via MCP roots/list RPC
     let detectedClientRoot: string | undefined = undefined;
@@ -264,6 +296,36 @@ export function createServer(): Server {
           const report = await SkillManager.checkMissingSkills(
             toolArgs.projectPath,
             toolArgs.configPath,
+            detectedClientRoot
+          );
+          return {
+            content: [
+              {
+                type: 'text',
+                text: report.summary,
+              },
+            ],
+          };
+        }
+
+        case 'remove_skills': {
+          const targetSkills = Array.isArray(toolArgs.skills) ? toolArgs.skills : [];
+          if (targetSkills.length === 0) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: 'Error: Parameter \'skills\' array cannot be empty.',
+                },
+              ],
+              isError: true,
+            };
+          }
+
+          const report = await SkillManager.removeSkills(
+            targetSkills,
+            Boolean(toolArgs.removeFromConfig),
+            toolArgs.projectPath,
             detectedClientRoot
           );
           return {

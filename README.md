@@ -79,7 +79,19 @@ Prepares the current project workspace automatically.
 ### 4. `skills-manager-mcp sync`
 Synchronizes current workspace skills with your global personal collection (`~/.ai-skills/skills.config.json`).
 
-### 5. `skills-manager-mcp setup`
+### 5. `skills-manager-mcp remove <skill1> [skill2]`
+Removes one or an array of specified skills or bundles from the project workspace `.agents/skills`.
+- Option `--from-config` also removes them from `skills.config.json` to prevent auto-reinstallation.
+
+```bash
+# Remove single skill
+skills-manager-mcp remove find-skills
+
+# Batch remove multiple skills & bundles
+skills-manager-mcp remove find-skills frontend-design mattpocock-skills --from-config
+```
+
+### 6. `skills-manager-mcp setup`
 Re-run setup & Antigravity MCP registration manually anytime.
 
 ---
@@ -121,6 +133,7 @@ When running inside Antigravity Desktop, the following MCP tools are available:
 - `bootstrap_project`: Prepares active workspace with skills and bundles.
 - `sync_skills`: Synchronizes workspace skills with personal collection.
 - `install_skills`: Installs missing skills and bundles.
+- `remove_skills`: Removes one or an array of specified skills/bundles from workspace.
 - `list_installed_skills`: Lists installed skills and bundle details.
 - `check_missing_skills`: Checks status of skills/bundles.
 - `get_workspace_info`: Debugging tool for inspecting workspace resolution.

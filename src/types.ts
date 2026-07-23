@@ -154,6 +154,29 @@ export interface CheckMissingReport {
 }
 
 /**
+ * Result of removing an individual skill or bundle.
+ */
+export interface RemoveResult {
+  skillName: string;
+  status: 'removed' | 'not_found' | 'failed';
+  message: string;
+}
+
+/**
+ * Aggregated report after running the `remove_skills` tool.
+ */
+export interface RemoveSkillsReport {
+  workspace: string;
+  source: string;
+  removed: string[];
+  notFound: string[];
+  failed: string[];
+  details: RemoveResult[];
+  summary: string;
+}
+
+
+/**
  * Input arguments for MCP tool calls.
  */
 export interface ToolArguments {

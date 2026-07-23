@@ -97,3 +97,23 @@ export async function listInstalledSkillFolders(projectPath: string): Promise<st
     return [];
   }
 }
+
+/**
+ * Removes a skill directory under `.agents/skills/<skillName>`.
+ *
+ * @param projectPath Absolute project root directory
+ * @param skillName Name of the skill to remove
+ * @returns True if directory existed and was deleted, false if directory did not exist
+ */
+export async function removeSkillFolder(
+  projectPath: string,
+  skillName: string
+): Promise<boolean> {
+  const { exists, skillPath } = await checkSkillExists(projectPath, skillName);
+  if (!exists) {
+    return false;
+  }
+  await fs.rm(skillPath, { recursive: true, force: true });
+  return true;
+}
+

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { SkillsTrackerFile, SkillMetadata, SkillType } from './types.js';
 
 const TRACKER_FILE_NAME = 'skills-manager.json';
-const CURRENT_TRACKER_VERSION = '1.5.1';
+const CURRENT_TRACKER_VERSION = '1.6.0';
 
 /**
  * Manages `.agents/skills-manager.json` version metadata file inside project directories.
@@ -106,4 +106,22 @@ export class Tracker {
     tracker.skills[entryName] = metadata;
     await Tracker.saveTracker(projectPath, tracker);
   }
+
+  /**
+   * Removes tracking metadata for a skill or bundle from `.agents/skills-manager.json`.
+   *
+   * @param projectPath Target project directory
+   * @param entryName Name of the skill or bundle to remove
+   */
+  public static async removeSkillFromTracker(
+    projectPath: string,
+    entryName: string
+  ): Promise<void> {
+    const tracker = await Tracker.loadTracker(projectPath);
+    if (tracker.skills[entryName]) {
+      delete tracker.skills[entryName];
+      await Tracker.saveTracker(projectPath, tracker);
+    }
+  }
 }
+

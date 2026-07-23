@@ -3,14 +3,22 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 
 /**
- * Resolves path to Antigravity Desktop MCP configuration file (mcp.json).
- *
- * Windows: %USERPROFILE%\.gemini\antigravity-ide\mcp.json
- * Linux/macOS: $HOME/.gemini/antigravity-ide/mcp.json
+ * Resolves paths to Antigravity Desktop MCP configuration files.
+ * Registers in both ~/.gemini/config/mcp_config.json and ~/.gemini/antigravity-ide/mcp.json.
+ */
+export function getAntigravityMcpConfigPaths(): string[] {
+  const home = os.homedir();
+  return [
+    path.join(home, '.gemini', 'config', 'mcp_config.json'),
+    path.join(home, '.gemini', 'antigravity-ide', 'mcp.json'),
+  ];
+}
+
+/**
+ * Returns primary Antigravity MCP config path for backwards compatibility.
  */
 export function getAntigravityMcpConfigPath(): string {
-  const home = os.homedir();
-  return path.join(home, '.gemini', 'antigravity-ide', 'mcp.json');
+  return getAntigravityMcpConfigPaths()[0];
 }
 
 /**
@@ -36,20 +44,10 @@ export interface RegistrationResult {
 }
 
 /**
- * Automatically registers skills-manager-mcp into Antigravity Desktop's mcp.json.
- * Preserves all existing MCP server configurations and operates idempotently.
- *
- * @param customServerPath Optional custom path to dist/index.js
- * @param customConfigPath Optional custom path to mcp.json file (for testing)
+ * Helper function to register skills-manager into a single mcp config JSON file.
  */
-export async function registerAntigravityMcp(
-  customServerPath?: string,
-  customConfigPath?: string
-): Promise<RegistrationResult> {
-  const configPath = customConfigPath || getAntigravityMcpConfigPath();
+async function registerIntoFile(configPath: string, serverIndexPath: string): Promise<boolean> {
   const configDir = path.dirname(configPath);
-  const serverIndexPath = customServerPath || getMcpServerIndexPath();
-
   await fs.mkdir(configDir, { recursive: true });
 
   let configData: any = { mcpServers: {} };
@@ -84,17 +82,40 @@ export async function registerAntigravityMcp(
   }
 
   await fs.writeFile(configPath, JSON.stringify(configData, null, 2), 'utf-8');
+  return newlyAdded;
+}
+
+/**
+ * Automatically registers skills-manager-mcp into Antigravity Desktop's mcp configuration files.
+ * Preserves all existing MCP server configurations and operates idempotently.
+ *
+ * @param customServerPath Optional custom path to dist/index.js
+ * @param customConfigPath Optional custom path to mcp.json file (for testing)
+ */
+export async function registerAntigravityMcp(
+  customServerPath?: string,
+  customConfigPath?: string
+): Promise<RegistrationResult> {
+  const targetPaths = customConfigPath ? [customConfigPath] : getAntigravityMcpConfigPaths();
+  const serverIndexPath = customServerPath || getMcpServerIndexPath();
+
+  let newlyAdded = false;
+
+  for (const targetPath of targetPaths) {
+    const added = await registerIntoFile(targetPath, serverIndexPath);
+    if (added) newlyAdded = true;
+  }
 
   return {
     registered: true,
-    configPath,
+    configPath: targetPaths[0],
     serverIndexPath,
     newlyAdded,
   };
 }
 
 /**
- * Safely removes the skills-manager MCP server entry from Antigravity Desktop's mcp.json.
+ * Safely removes the skills-manager MCP server entry from Antigravity Desktop's mcp configuration files.
  * Preserves all other user MCP servers and does not delete user skill caches (~/.ai-skills).
  *
  * @param customConfigPath Optional custom path to mcp.json file (for testing)
@@ -102,19 +123,21 @@ export async function registerAntigravityMcp(
 export async function unregisterAntigravityMcp(
   customConfigPath?: string
 ): Promise<{ unregistered: boolean; configPath: string }> {
-  const configPath = customConfigPath || getAntigravityMcpConfigPath();
+  const targetPaths = customConfigPath ? [customConfigPath] : getAntigravityMcpConfigPaths();
 
-  try {
-    const existingContent = await fs.readFile(configPath, 'utf-8');
-    const parsed = JSON.parse(existingContent);
+  for (const targetPath of targetPaths) {
+    try {
+      const existingContent = await fs.readFile(targetPath, 'utf-8');
+      const parsed = JSON.parse(existingContent);
 
-    if (parsed && parsed.mcpServers && parsed.mcpServers['skills-manager']) {
-      delete parsed.mcpServers['skills-manager'];
-      await fs.writeFile(configPath, JSON.stringify(parsed, null, 2), 'utf-8');
+      if (parsed && parsed.mcpServers && parsed.mcpServers['skills-manager']) {
+        delete parsed.mcpServers['skills-manager'];
+        await fs.writeFile(targetPath, JSON.stringify(parsed, null, 2), 'utf-8');
+      }
+    } catch {
+      // Ignore if file doesn't exist
     }
-  } catch {
-    // Ignore if file doesn't exist
   }
 
-  return { unregistered: true, configPath };
+  return { unregistered: true, configPath: targetPaths[0] };
 }

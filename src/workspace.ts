@@ -183,27 +183,29 @@ export async function detectWorkspace(
   // 1. Explicit tool argument
   if (providedPath && providedPath.trim() !== '') {
     const resolved = path.resolve(providedPath.trim());
+    let stats: any;
     try {
-      const stats = await fs.stat(resolved);
-      if (!stats.isDirectory()) {
-        throw new Error(`Specified projectPath does not exist: '${providedPath}'`);
-      }
-      if (preventServerInstall && (await isServerDirectory(resolved))) {
-        throw new Error(
-          `Installation Blocked: '${resolved}' is the skills-manager-mcp server directory. Skills cannot be installed into the server project itself. Please pass your development project path in 'projectPath' (e.g. projectPath: 'D:/Projects/Work/my-project').`
-        );
-      }
-      return {
-        workspacePath: resolved,
-        source: 'argument',
-        mcpServerDirectory: serverDir,
-        isValidWorkspace: true,
-      };
-    } catch (err: any) {
-      if (err.message.includes('Installation Blocked') || err.message.includes('does not exist')) {
-        throw err;
-      }
+      stats = await fs.stat(resolved);
+    } catch {
+      throw new Error(`Specified projectPath does not exist: '${providedPath}'`);
     }
+
+    if (!stats.isDirectory()) {
+      throw new Error(`Specified projectPath is not a directory: '${providedPath}'`);
+    }
+
+    if (preventServerInstall && (await isServerDirectory(resolved))) {
+      throw new Error(
+        `Installation Blocked: '${resolved}' is the skills-manager-mcp server directory. Skills cannot be installed into the server project itself. Please pass your development project path in 'projectPath' (e.g. projectPath: 'D:/Projects/Work/my-project').`
+      );
+    }
+
+    return {
+      workspacePath: resolved,
+      source: 'argument',
+      mcpServerDirectory: serverDir,
+      isValidWorkspace: true,
+    };
   }
 
   // 2. Antigravity environment variables

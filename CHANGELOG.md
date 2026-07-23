@@ -5,6 +5,23 @@ All notable changes to the `skills-manager-mcp` project will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-07-23
+
+### Added
+- **Skill & Bundle Removal System (`remove_skills`)**: Added ability to remove single or multiple skills/bundles at once from project workspace `.agents/skills`.
+- **New MCP Tool (`remove_skills`)**: Accepts an array of skill or bundle names and removes their directory, tracker metadata, and optionally removes them from project `skills.config.json`.
+- **New CLI Command (`skills-manager-mcp remove`)**: Added `skills-manager-mcp remove <skill1> [skill2] [--from-config]`.
+- **Bundle Teardown**: Automatically cleans up all nested sub-skills associated with a bundle when the bundle name is specified for removal.
+
+---
+
+## [1.5.2] - 2026-07-22
+
+### Fixed
+- **Multi-Path Antigravity Registration**: Registration engine now writes entries into **both** `~/.gemini/config/mcp_config.json` and `~/.gemini/antigravity-ide/mcp.json` to guarantee Antigravity Desktop UI lists `skills-manager` immediately under MCP Servers settings.
+
+---
+
 ## [1.5.1] - 2026-07-22
 
 ### Changed

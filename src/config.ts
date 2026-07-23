@@ -104,3 +104,42 @@ export async function loadSkillsConfig(
 
   return DEFAULT_CONFIG;
 }
+
+/**
+ * Removes specified skill names from the target project's `skills.config.json` if present.
+ *
+ * @param targetProjectPath Target project directory
+ * @param skillNames Array of skill or bundle names to remove
+ * @returns True if config was updated, false otherwise
+ */
+export async function removeSkillsFromConfig(
+  targetProjectPath: string,
+  skillNames: string[]
+): Promise<boolean> {
+  const configPath = path.join(targetProjectPath, 'skills.config.json');
+  try {
+    const fileExists = await fs.stat(configPath).then((s) => s.isFile()).catch(() => false);
+    if (!fileExists) return false;
+
+    const rawContent = await fs.readFile(configPath, 'utf-8');
+    const parsed = JSON.parse(rawContent) as Partial<SkillsConfigFile>;
+
+    if (!parsed || !Array.isArray(parsed.skills)) return false;
+
+    const namesToRemove = new Set(skillNames.map((n) => n.trim().toLowerCase()));
+    const initialCount = parsed.skills.length;
+
+    parsed.skills = parsed.skills.filter(
+      (item) => item && item.name && !namesToRemove.has(item.name.trim().toLowerCase())
+    );
+
+    if (parsed.skills.length !== initialCount) {
+      await fs.writeFile(configPath, JSON.stringify(parsed, null, 2), 'utf-8');
+      return true;
+    }
+  } catch {
+    // Ignore errors
+  }
+  return false;
+}
+
