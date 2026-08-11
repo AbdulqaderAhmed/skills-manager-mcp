@@ -1,6 +1,7 @@
-import os from 'node:os';
-import path from 'node:path';
-import fs from 'node:fs/promises';
+import os from "node:os";
+import path from "node:path";
+import fs from "node:fs/promises";
+import { getModuleDir } from "../nodeCompat.js";
 
 /**
  * Resolves paths to Antigravity Desktop MCP configuration files.
@@ -9,8 +10,8 @@ import fs from 'node:fs/promises';
 export function getAntigravityMcpConfigPaths(): string[] {
   const home = os.homedir();
   return [
-    path.join(home, '.gemini', 'config', 'mcp_config.json'),
-    path.join(home, '.gemini', 'antigravity-ide', 'mcp.json'),
+    path.join(home, ".gemini", "config", "mcp_config.json"),
+    path.join(home, ".gemini", "antigravity-ide", "mcp.json"),
   ];
 }
 
@@ -26,14 +27,13 @@ export function getAntigravityMcpConfigPath(): string {
  * Handles execution from both src/services and dist/services.
  */
 export function getMcpServerIndexPath(): string {
-  const moduleDir = path.dirname(new URL(import.meta.url).pathname);
-  const normalizedModuleDir =
-    process.platform === 'win32' && moduleDir.startsWith('/')
-      ? moduleDir.slice(1)
-      : moduleDir;
   // Resolve root package directory from src/services or dist/services
-  const projectRootDir = path.resolve(normalizedModuleDir, '..', '..');
-  return path.join(projectRootDir, 'dist', 'index.js');
+  const projectRootDir = path.resolve(
+    getModuleDir(import.meta.url),
+    "..",
+    "..",
+  );
+  return path.join(projectRootDir, "dist", "index.js");
 }
 
 export interface RegistrationResult {
@@ -46,18 +46,21 @@ export interface RegistrationResult {
 /**
  * Helper function to register skills-manager into a single mcp config JSON file.
  */
-async function registerIntoFile(configPath: string, serverIndexPath: string): Promise<boolean> {
+async function registerIntoFile(
+  configPath: string,
+  serverIndexPath: string,
+): Promise<boolean> {
   const configDir = path.dirname(configPath);
   await fs.mkdir(configDir, { recursive: true });
 
   let configData: any = { mcpServers: {} };
 
   try {
-    const existingContent = await fs.readFile(configPath, 'utf-8');
+    const existingContent = await fs.readFile(configPath, "utf-8");
     const parsed = JSON.parse(existingContent);
-    if (parsed && typeof parsed === 'object') {
+    if (parsed && typeof parsed === "object") {
       configData = parsed;
-      if (!configData.mcpServers || typeof configData.mcpServers !== 'object') {
+      if (!configData.mcpServers || typeof configData.mcpServers !== "object") {
         configData.mcpServers = {};
       }
     }
@@ -66,22 +69,22 @@ async function registerIntoFile(configPath: string, serverIndexPath: string): Pr
   }
 
   let newlyAdded = false;
-  const existingEntry = configData.mcpServers['skills-manager'];
+  const existingEntry = configData.mcpServers["skills-manager"];
 
   if (
     !existingEntry ||
-    existingEntry.command !== 'node' ||
+    existingEntry.command !== "node" ||
     !Array.isArray(existingEntry.args) ||
     existingEntry.args[0] !== serverIndexPath
   ) {
-    configData.mcpServers['skills-manager'] = {
-      command: 'node',
+    configData.mcpServers["skills-manager"] = {
+      command: "node",
       args: [serverIndexPath],
     };
     newlyAdded = true;
   }
 
-  await fs.writeFile(configPath, JSON.stringify(configData, null, 2), 'utf-8');
+  await fs.writeFile(configPath, JSON.stringify(configData, null, 2), "utf-8");
   return newlyAdded;
 }
 
@@ -94,9 +97,11 @@ async function registerIntoFile(configPath: string, serverIndexPath: string): Pr
  */
 export async function registerAntigravityMcp(
   customServerPath?: string,
-  customConfigPath?: string
+  customConfigPath?: string,
 ): Promise<RegistrationResult> {
-  const targetPaths = customConfigPath ? [customConfigPath] : getAntigravityMcpConfigPaths();
+  const targetPaths = customConfigPath
+    ? [customConfigPath]
+    : getAntigravityMcpConfigPaths();
   const serverIndexPath = customServerPath || getMcpServerIndexPath();
 
   let newlyAdded = false;
@@ -121,18 +126,24 @@ export async function registerAntigravityMcp(
  * @param customConfigPath Optional custom path to mcp.json file (for testing)
  */
 export async function unregisterAntigravityMcp(
-  customConfigPath?: string
+  customConfigPath?: string,
 ): Promise<{ unregistered: boolean; configPath: string }> {
-  const targetPaths = customConfigPath ? [customConfigPath] : getAntigravityMcpConfigPaths();
+  const targetPaths = customConfigPath
+    ? [customConfigPath]
+    : getAntigravityMcpConfigPaths();
 
   for (const targetPath of targetPaths) {
     try {
-      const existingContent = await fs.readFile(targetPath, 'utf-8');
+      const existingContent = await fs.readFile(targetPath, "utf-8");
       const parsed = JSON.parse(existingContent);
 
-      if (parsed && parsed.mcpServers && parsed.mcpServers['skills-manager']) {
-        delete parsed.mcpServers['skills-manager'];
-        await fs.writeFile(targetPath, JSON.stringify(parsed, null, 2), 'utf-8');
+      if (parsed && parsed.mcpServers && parsed.mcpServers["skills-manager"]) {
+        delete parsed.mcpServers["skills-manager"];
+        await fs.writeFile(
+          targetPath,
+          JSON.stringify(parsed, null, 2),
+          "utf-8",
+        );
       }
     } catch {
       // Ignore if file doesn't exist

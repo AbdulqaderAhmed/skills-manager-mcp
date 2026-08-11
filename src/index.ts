@@ -1,9 +1,13 @@
 #!/usr/bin/env node
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createServer } from './server.js';
-import { ensureInitialized } from './services/initializer.js';
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { createServer } from "./server.js";
+import { ensureInitialized } from "./services/initializer.js";
+import { assertNodeVersion } from "./nodeCompat.js";
 
 async function main() {
+  // Fail fast with a clear message on unsupported Node.js versions
+  assertNodeVersion();
+
   // Ensure global storage, cache, and MCP registration exist silently
   await ensureInitialized({ silent: true }).catch(() => {});
 
@@ -11,12 +15,12 @@ async function main() {
   const transport = new StdioServerTransport();
 
   // Process signal handlers
-  process.on('SIGINT', async () => {
+  process.on("SIGINT", async () => {
     await server.close();
     process.exit(0);
   });
 
-  process.on('SIGTERM', async () => {
+  process.on("SIGTERM", async () => {
     await server.close();
     process.exit(0);
   });
@@ -26,6 +30,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('Fatal error starting skills-manager-mcp server:', err);
+  console.error("Fatal error starting skills-manager-mcp server:", err);
   process.exit(1);
 });

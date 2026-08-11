@@ -1,12 +1,13 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { GlobalConfig } from '../globalConfig.js';
-import { CacheManager } from '../cacheManager.js';
+import fs from "node:fs/promises";
+import path from "node:path";
+import { GlobalConfig } from "../globalConfig.js";
+import { CacheManager } from "../cacheManager.js";
 import {
   getAntigravityMcpConfigPath,
   getMcpServerIndexPath,
   registerAntigravityMcp,
-} from './antigravityRegistry.js';
+} from "./antigravityRegistry.js";
+import { isVsCodeMcpRegistered, registerVsCodeMcp } from "./vscodeRegistry.js";
 
 export interface InitializeOptions {
   silent?: boolean;
@@ -22,7 +23,9 @@ export interface InitializeResult {
 /**
  * Checks whether global skills storage, cache, and Antigravity MCP registration have been completed.
  */
-export async function isInitialized(customConfigPath?: string): Promise<boolean> {
+export async function isInitialized(
+  customConfigPath?: string,
+): Promise<boolean> {
   try {
     // 1. Check global skills config (~/.ai-skills/skills.config.json)
     const globalConfigPath = GlobalConfig.getGlobalConfigPath();
@@ -44,11 +47,16 @@ export async function isInitialized(customConfigPath?: string): Promise<boolean>
 
     // 3. Check Antigravity MCP registration (mcp.json)
     const mcpConfigPath = customConfigPath || getAntigravityMcpConfigPath();
-    const mcpContent = await fs.readFile(mcpConfigPath, 'utf-8');
+    const mcpContent = await fs.readFile(mcpConfigPath, "utf-8");
     const parsed = JSON.parse(mcpContent);
-    const entry = parsed?.mcpServers?.['skills-manager'];
+    const entry = parsed?.mcpServers?.["skills-manager"];
 
-    if (!entry || entry.command !== 'node' || !Array.isArray(entry.args) || !entry.args[0]) {
+    if (
+      !entry ||
+      entry.command !== "node" ||
+      !Array.isArray(entry.args) ||
+      !entry.args[0]
+    ) {
       return false;
     }
 
@@ -58,7 +66,14 @@ export async function isInitialized(customConfigPath?: string): Promise<boolean>
       .then((s) => s.isFile())
       .catch(() => false);
 
-    return serverFileExists;
+    if (!serverFileExists) return false;
+
+    // 4. Check VS Code MCP registration (only when not using a custom test config)
+    if (!customConfigPath) {
+      return await isVsCodeMcpRegistered();
+    }
+
+    return true;
   } catch {
     return false;
   }
@@ -68,7 +83,9 @@ export async function isInitialized(customConfigPath?: string): Promise<boolean>
  * Idempotently ensures global storage, cache, and Antigravity MCP registration exist.
  * Executes first-time setup automatically if missing.
  */
-export async function ensureInitialized(options: InitializeOptions = {}): Promise<InitializeResult> {
+export async function ensureInitialized(
+  options: InitializeOptions = {},
+): Promise<InitializeResult> {
   const alreadyInitialized = await isInitialized(options.customConfigPath);
 
   if (alreadyInitialized) {
@@ -76,7 +93,7 @@ export async function ensureInitialized(options: InitializeOptions = {}): Promis
   }
 
   if (!options.silent) {
-    console.log('Skills Manager MCP first-time setup detected...\n');
+    console.log("Skills Manager MCP first-time setup detected...\n");
   }
 
   // 1. Ensure global storage & cache
@@ -94,13 +111,23 @@ export async function ensureInitialized(options: InitializeOptions = {}): Promis
   // 3. Automatically register MCP server in mcp.json
   const regResult = await registerAntigravityMcp(
     options.customServerPath,
-    options.customConfigPath
+    options.customConfigPath,
   );
 
   if (!options.silent) {
     console.log(`✓ Antigravity MCP registered: ${regResult.configPath}`);
-    console.log(`✓ Server executable path: ${regResult.serverIndexPath}\n`);
-    console.log('Initialization complete.\n');
+    console.log(`✓ Server executable path: ${regResult.serverIndexPath}`);
+  }
+
+  // 4. Automatically register MCP server in VS Code user mcp.json
+  const vsCodeRegResult = await registerVsCodeMcp(
+    options.customServerPath,
+    options.customConfigPath,
+  );
+
+  if (!options.silent) {
+    console.log(`✓ VS Code MCP registered: ${vsCodeRegResult.configPaths[0]}`);
+    console.log("\nInitialization complete.\n");
   }
 
   return { newlyInitialized: true, mcpRegistered: regResult.registered };

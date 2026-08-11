@@ -1,12 +1,13 @@
-import os from 'node:os';
-import path from 'node:path';
-import fs from 'node:fs/promises';
-import { GlobalConfig } from '../globalConfig.js';
-import { CacheManager } from '../cacheManager.js';
+import os from "node:os";
+import path from "node:path";
+import fs from "node:fs/promises";
+import { GlobalConfig } from "../globalConfig.js";
+import { CacheManager } from "../cacheManager.js";
 import {
   registerAntigravityMcp,
   getAntigravityMcpConfigPath,
-} from '../services/antigravityRegistry.js';
+} from "../services/antigravityRegistry.js";
+import { registerVsCodeMcp } from "../services/vscodeRegistry.js";
 
 // Re-export helper for external callers / tests
 export { getAntigravityMcpConfigPath, registerAntigravityMcp };
@@ -15,13 +16,13 @@ export { getAntigravityMcpConfigPath, registerAntigravityMcp };
  * Executes the `skills-manager-mcp setup` CLI command.
  */
 export async function runSetupCommand(): Promise<void> {
-  console.log('Skills Manager MCP Setup\n');
+  console.log("Skills Manager MCP Setup\n");
 
   // 1. Detect OS
   const platform = os.platform();
-  let osName = 'Linux/Unix';
-  if (platform === 'win32') osName = 'Windows';
-  else if (platform === 'darwin') osName = 'macOS';
+  let osName = "Linux/Unix";
+  if (platform === "win32") osName = "Windows";
+  else if (platform === "darwin") osName = "macOS";
 
   console.log(`✓ Operating system detected: ${osName} (${platform})`);
 
@@ -32,13 +33,20 @@ export async function runSetupCommand(): Promise<void> {
 
   // 3. Create default skills.config.json if missing (preserve existing file)
   const globalConfigPath = GlobalConfig.getGlobalConfigPath();
-  const existsBefore = await fs.stat(globalConfigPath).then((s) => s.isFile()).catch(() => false);
+  const existsBefore = await fs
+    .stat(globalConfigPath)
+    .then((s) => s.isFile())
+    .catch(() => false);
   await GlobalConfig.loadGlobalSkillsConfig();
 
   if (existsBefore) {
-    console.log(`✓ Preserved existing global skills collection: ${globalConfigPath}`);
+    console.log(
+      `✓ Preserved existing global skills collection: ${globalConfigPath}`,
+    );
   } else {
-    console.log(`✓ Created default global skills collection: ${globalConfigPath}`);
+    console.log(
+      `✓ Created default global skills collection: ${globalConfigPath}`,
+    );
   }
 
   // 4. Register in Antigravity Desktop mcp.json
@@ -50,6 +58,14 @@ export async function runSetupCommand(): Promise<void> {
     console.error(`✗ Antigravity MCP registration failed: ${err.message}`);
   }
 
-  console.log('\nSetup completed successfully!');
+  // 5. Register in VS Code user mcp.json
+  try {
+    const vsCodeRegResult = await registerVsCodeMcp();
+    console.log(`✓ VS Code MCP registered (${vsCodeRegResult.configPaths[0]})`);
+  } catch (err: any) {
+    console.error(`✗ VS Code MCP registration failed: ${err.message}`);
+  }
+
+  console.log("\nSetup completed successfully!");
   console.log('Run "skills-manager-mcp status" to inspect your installation.');
 }

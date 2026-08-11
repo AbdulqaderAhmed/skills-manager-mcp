@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
-import { runSetupCommand } from './commands/setup.js';
-import { runBootstrapCommand } from './commands/bootstrap.js';
-import { runSyncCommand } from './commands/sync.js';
-import { runStatusCommand } from './commands/status.js';
-import { runDoctorCommand } from './commands/doctor.js';
-import { runRemoveCommand } from './commands/remove.js';
-import { ensureInitialized } from './services/initializer.js';
+import { runSetupCommand } from "./commands/setup.js";
+import { runBootstrapCommand } from "./commands/bootstrap.js";
+import { runSyncCommand } from "./commands/sync.js";
+import { runStatusCommand } from "./commands/status.js";
+import { runDoctorCommand } from "./commands/doctor.js";
+import { runRemoveCommand } from "./commands/remove.js";
+import { ensureInitialized } from "./services/initializer.js";
+import { assertNodeVersion } from "./nodeCompat.js";
 
 /**
  * Prints CLI help menu.
@@ -30,11 +31,14 @@ Commands:
 }
 
 async function main(): Promise<void> {
+  // Fail fast with a clear message on unsupported Node.js versions
+  assertNodeVersion();
+
   const args = process.argv.slice(2);
   const command = args[0]?.toLowerCase();
 
   // Commands that bypass automatic first-run initialization
-  const bypassAutoInit = ['setup', 'doctor', 'help', '--help', '-h'];
+  const bypassAutoInit = ["setup", "doctor", "help", "--help", "-h"];
 
   if (!command || !bypassAutoInit.includes(command)) {
     await ensureInitialized();
@@ -46,37 +50,38 @@ async function main(): Promise<void> {
   }
 
   switch (command) {
-    case 'status':
+    case "status":
       await runStatusCommand(args[1]);
       break;
 
-    case 'bootstrap':
+    case "bootstrap":
       await runBootstrapCommand(args[1]);
       break;
 
-    case 'sync':
+    case "sync":
       await runSyncCommand(args[1]);
       break;
 
-    case 'remove': {
+    case "remove": {
       const rawTargets = args.slice(1);
-      const removeFromConfig = rawTargets.includes('--from-config') || rawTargets.includes('-c');
-      const skills = rawTargets.filter((a) => !a.startsWith('-'));
+      const removeFromConfig =
+        rawTargets.includes("--from-config") || rawTargets.includes("-c");
+      const skills = rawTargets.filter((a) => !a.startsWith("-"));
       await runRemoveCommand(skills, { removeFromConfig });
       break;
     }
 
-    case 'setup':
+    case "setup":
       await runSetupCommand();
       break;
 
-    case 'doctor':
+    case "doctor":
       await runDoctorCommand();
       break;
 
-    case 'help':
-    case '--help':
-    case '-h':
+    case "help":
+    case "--help":
+    case "-h":
       printHelp();
       break;
 
@@ -88,6 +93,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('Fatal CLI error:', err);
+  console.error("Fatal CLI error:", err);
   process.exit(1);
 });

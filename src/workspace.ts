@@ -1,35 +1,31 @@
-import path from 'node:path';
-import fs from 'node:fs/promises';
-import os from 'node:os';
+import path from "node:path";
+import fs from "node:fs/promises";
+import os from "node:os";
+import { getModuleDir } from "./nodeCompat.js";
 import {
   WorkspaceDetectionResult,
   WorkspaceDetectionSource,
   GlobalSettingsFile,
   WorkspaceConfig,
-} from './types.js';
+} from "./types.js";
 
 const DEFAULT_MARKERS = [
-  'package.json',
-  'pnpm-lock.yaml',
-  'package-lock.json',
-  'yarn.lock',
-  '.git',
-  'pyproject.toml',
-  'requirements.txt',
-  '.sln',
-  '.csproj',
+  "package.json",
+  "pnpm-lock.yaml",
+  "package-lock.json",
+  "yarn.lock",
+  ".git",
+  "pyproject.toml",
+  "requirements.txt",
+  ".sln",
+  ".csproj",
 ];
 
 /**
  * Returns the absolute directory path of the skills-manager-mcp server itself.
  */
 export function getMcpServerDirectory(): string {
-  const moduleDir = path.dirname(new URL(import.meta.url).pathname);
-  const normalizedModuleDir =
-    process.platform === 'win32' && moduleDir.startsWith('/')
-      ? moduleDir.slice(1)
-      : moduleDir;
-  return path.resolve(normalizedModuleDir, '..');
+  return path.resolve(getModuleDir(import.meta.url), "..");
 }
 
 /**
@@ -45,10 +41,10 @@ export async function isServerDirectory(targetPath: string): Promise<boolean> {
 
   // Double check by reading package.json name if present
   try {
-    const pkgPath = path.join(normalizedTarget, 'package.json');
-    const content = await fs.readFile(pkgPath, 'utf-8');
+    const pkgPath = path.join(normalizedTarget, "package.json");
+    const content = await fs.readFile(pkgPath, "utf-8");
     const parsed = JSON.parse(content);
-    if (parsed && parsed.name === 'skills-manager-mcp') {
+    if (parsed && parsed.name === "skills-manager-mcp") {
       return true;
     }
   } catch {
@@ -62,7 +58,7 @@ export async function isServerDirectory(targetPath: string): Promise<boolean> {
  * Loads configuration options from ~/.ai-skills/config.json, automatically creating it if missing.
  */
 export async function loadGlobalWorkspaceConfig(): Promise<WorkspaceConfig> {
-  const configPath = path.join(os.homedir(), '.ai-skills', 'config.json');
+  const configPath = path.join(os.homedir(), ".ai-skills", "config.json");
   const configDir = path.dirname(configPath);
 
   const defaultConfig: WorkspaceConfig = {
@@ -73,16 +69,25 @@ export async function loadGlobalWorkspaceConfig(): Promise<WorkspaceConfig> {
 
   try {
     await fs.mkdir(configDir, { recursive: true });
-    const exists = await fs.stat(configPath).then((s) => s.isFile()).catch(() => false);
+    const exists = await fs
+      .stat(configPath)
+      .then((s) => s.isFile())
+      .catch(() => false);
 
     if (!exists) {
       // Automatically create default ~/.ai-skills/config.json if missing
-      const settingsObj: GlobalSettingsFile = { workspaceDetection: defaultConfig };
-      await fs.writeFile(configPath, JSON.stringify(settingsObj, null, 2), 'utf-8');
+      const settingsObj: GlobalSettingsFile = {
+        workspaceDetection: defaultConfig,
+      };
+      await fs.writeFile(
+        configPath,
+        JSON.stringify(settingsObj, null, 2),
+        "utf-8",
+      );
       return defaultConfig;
     }
 
-    const content = await fs.readFile(configPath, 'utf-8');
+    const content = await fs.readFile(configPath, "utf-8");
     const parsed = JSON.parse(content) as GlobalSettingsFile;
     if (parsed && parsed.workspaceDetection) {
       return parsed.workspaceDetection;
@@ -103,7 +108,7 @@ export async function loadGlobalWorkspaceConfig(): Promise<WorkspaceConfig> {
  */
 export async function findProjectRoot(
   startDir: string,
-  markers: string[] = DEFAULT_MARKERS
+  markers: string[] = DEFAULT_MARKERS,
 ): Promise<string | null> {
   let currentDir = path.resolve(startDir);
   const rootDir = path.parse(currentDir).root;
@@ -120,8 +125,10 @@ export async function findProjectRoot(
     try {
       const entries = await fs.readdir(currentDir);
       const hasMarker = markers.some((marker) => {
-        if (marker.endsWith('.sln') || marker.endsWith('.csproj')) {
-          return entries.some((e) => e.endsWith('.sln') || e.endsWith('.csproj'));
+        if (marker.endsWith(".sln") || marker.endsWith(".csproj")) {
+          return entries.some(
+            (e) => e.endsWith(".sln") || e.endsWith(".csproj"),
+          );
         }
         return entries.includes(marker);
       });
@@ -157,7 +164,7 @@ export async function findProjectRoot(
  */
 export async function detectWorkspace(
   providedPath?: string,
-  clientRootPath?: string
+  clientRootPath?: string,
 ): Promise<WorkspaceDetectionResult> {
   const config = await loadGlobalWorkspaceConfig();
   const preventServerInstall = config.preventServerDirectoryInstall !== false;
@@ -165,8 +172,10 @@ export async function detectWorkspace(
   const markers = config.preferredMarkers || DEFAULT_MARKERS;
 
   // Helper to test if a candidate directory is valid and allowed
-  const isValidCandidate = async (candidate?: string): Promise<string | null> => {
-    if (!candidate || candidate.trim() === '') return null;
+  const isValidCandidate = async (
+    candidate?: string,
+  ): Promise<string | null> => {
+    if (!candidate || candidate.trim() === "") return null;
     const resolved = path.resolve(candidate.trim());
     try {
       const stats = await fs.stat(resolved);
@@ -181,28 +190,32 @@ export async function detectWorkspace(
   };
 
   // 1. Explicit tool argument
-  if (providedPath && providedPath.trim() !== '') {
+  if (providedPath && providedPath.trim() !== "") {
     const resolved = path.resolve(providedPath.trim());
     let stats: any;
     try {
       stats = await fs.stat(resolved);
     } catch {
-      throw new Error(`Specified projectPath does not exist: '${providedPath}'`);
+      throw new Error(
+        `Specified projectPath does not exist: '${providedPath}'`,
+      );
     }
 
     if (!stats.isDirectory()) {
-      throw new Error(`Specified projectPath is not a directory: '${providedPath}'`);
+      throw new Error(
+        `Specified projectPath is not a directory: '${providedPath}'`,
+      );
     }
 
     if (preventServerInstall && (await isServerDirectory(resolved))) {
       throw new Error(
-        `Installation Blocked: '${resolved}' is the skills-manager-mcp server directory. Skills cannot be installed into the server project itself. Please pass your development project path in 'projectPath' (e.g. projectPath: 'D:/Projects/Work/my-project').`
+        `Installation Blocked: '${resolved}' is the skills-manager-mcp server directory. Skills cannot be installed into the server project itself. Please pass your development project path in 'projectPath' (e.g. projectPath: 'D:/Projects/Work/my-project').`,
       );
     }
 
     return {
       workspacePath: resolved,
-      source: 'argument',
+      source: "argument",
       mcpServerDirectory: serverDir,
       isValidWorkspace: true,
     };
@@ -219,7 +232,7 @@ export async function detectWorkspace(
     if (valid) {
       return {
         workspacePath: valid,
-        source: 'environment',
+        source: "environment",
         mcpServerDirectory: serverDir,
         isValidWorkspace: true,
       };
@@ -231,7 +244,7 @@ export async function detectWorkspace(
   if (validClientRoot) {
     return {
       workspacePath: validClientRoot,
-      source: 'antigravity',
+      source: "antigravity",
       mcpServerDirectory: serverDir,
       isValidWorkspace: true,
     };
@@ -252,7 +265,7 @@ export async function detectWorkspace(
       if (discoveredRoot && (await isValidCandidate(discoveredRoot))) {
         return {
           workspacePath: discoveredRoot,
-          source: 'project-root',
+          source: "project-root",
           mcpServerDirectory: serverDir,
           isValidWorkspace: true,
         };
@@ -265,7 +278,7 @@ export async function detectWorkspace(
   if (validCwd) {
     return {
       workspacePath: validCwd,
-      source: 'fallback',
+      source: "fallback",
       mcpServerDirectory: serverDir,
       isValidWorkspace: true,
     };
@@ -273,6 +286,6 @@ export async function detectWorkspace(
 
   // If process.cwd() or all candidates were rejected because they equal the MCP server directory:
   throw new Error(
-    `Installation Blocked: The current directory ('${serverDir}') is the skills-manager-mcp server project directory. Skills cannot be installed here. Please open your development project folder in Antigravity Desktop or pass your project path in 'projectPath' (e.g. projectPath: 'D:/Projects/Work/my-project').`
+    `Installation Blocked: The current directory ('${serverDir}') is the skills-manager-mcp server project directory. Skills cannot be installed here. Please open your development project folder in Antigravity Desktop or pass your project path in 'projectPath' (e.g. projectPath: 'D:/Projects/Work/my-project').`,
   );
 }

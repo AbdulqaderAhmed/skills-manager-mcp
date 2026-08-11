@@ -30,6 +30,9 @@
   },
   "homepage": "https://github.com/AbdulqaderAhmed/skills-manager-mcp#readme",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",

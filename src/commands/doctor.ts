@@ -1,11 +1,15 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
+import fs from "node:fs/promises";
+import path from "node:path";
 import {
   getAntigravityMcpConfigPath,
   getMcpServerIndexPath,
-} from '../services/antigravityRegistry.js';
-import { CacheManager } from '../cacheManager.js';
-import { GlobalConfig } from '../globalConfig.js';
+} from "../services/antigravityRegistry.js";
+import {
+  getVsCodeMcpConfigPaths,
+  isVsCodeMcpRegistered,
+} from "../services/vscodeRegistry.js";
+import { CacheManager } from "../cacheManager.js";
+import { GlobalConfig } from "../globalConfig.js";
 
 export interface DoctorCheckResult {
   title: string;
@@ -27,7 +31,7 @@ export async function performDoctorChecks(): Promise<DoctorCheckResult[]> {
     .catch(() => false);
 
   results.push({
-    title: 'dist/index.js exists',
+    title: "dist/index.js exists",
     success: indexExists,
     message: indexExists ? indexPath : `Missing at ${indexPath}`,
   });
@@ -40,22 +44,27 @@ export async function performDoctorChecks(): Promise<DoctorCheckResult[]> {
     .catch(() => false);
 
   results.push({
-    title: 'Antigravity configuration exists',
+    title: "Antigravity configuration exists",
     success: configExists,
     message: configExists ? mcpConfigPath : `Missing at ${mcpConfigPath}`,
   });
 
   // Check 3: MCP registration path validity in mcp.json
   let mcpPathValid = false;
-  let mcpPathDetail = 'skills-manager entry not found in mcp.json';
+  let mcpPathDetail = "skills-manager entry not found in mcp.json";
 
   if (configExists) {
     try {
-      const content = await fs.readFile(mcpConfigPath, 'utf-8');
+      const content = await fs.readFile(mcpConfigPath, "utf-8");
       const parsed = JSON.parse(content);
-      const entry = parsed?.mcpServers?.['skills-manager'];
+      const entry = parsed?.mcpServers?.["skills-manager"];
 
-      if (entry && entry.command === 'node' && Array.isArray(entry.args) && entry.args[0]) {
+      if (
+        entry &&
+        entry.command === "node" &&
+        Array.isArray(entry.args) &&
+        entry.args[0]
+      ) {
         const configuredPath = entry.args[0];
         const targetExists = await fs
           .stat(configuredPath)
@@ -75,9 +84,19 @@ export async function performDoctorChecks(): Promise<DoctorCheckResult[]> {
   }
 
   results.push({
-    title: 'MCP path valid',
+    title: "MCP path valid",
     success: mcpPathValid,
     message: mcpPathDetail,
+  });
+
+  // Check 3b: VS Code MCP registration
+  const vsCodeRegistered = await isVsCodeMcpRegistered();
+  results.push({
+    title: "VS Code MCP registered",
+    success: vsCodeRegistered,
+    message: vsCodeRegistered
+      ? getVsCodeMcpConfigPaths()[0]
+      : `Missing in ${getVsCodeMcpConfigPaths()[0]} (run "skills-manager-mcp setup")`,
   });
 
   // Check 4: Global cache availability (~/.ai-skills/cache)
@@ -88,7 +107,7 @@ export async function performDoctorChecks(): Promise<DoctorCheckResult[]> {
     .catch(() => false);
 
   results.push({
-    title: 'Global cache available',
+    title: "Global cache available",
     success: cacheExists,
     message: cacheExists ? cacheDir : `Missing at ${cacheDir}`,
   });
@@ -96,23 +115,23 @@ export async function performDoctorChecks(): Promise<DoctorCheckResult[]> {
   // Check 5: skills.config.json validity
   const globalConfigPath = GlobalConfig.getGlobalConfigPath();
   let configValid = false;
-  let configDetail = '';
+  let configDetail = "";
 
   try {
-    const configContent = await fs.readFile(globalConfigPath, 'utf-8');
+    const configContent = await fs.readFile(globalConfigPath, "utf-8");
     const parsed = JSON.parse(configContent);
     if (parsed && Array.isArray(parsed.skills)) {
       configValid = true;
       configDetail = `${parsed.skills.length} skills/bundles configured`;
     } else {
-      configDetail = 'skills property is missing or not an array';
+      configDetail = "skills property is missing or not an array";
     }
   } catch (err: any) {
     configDetail = `Missing or invalid JSON at ${globalConfigPath}`;
   }
 
   results.push({
-    title: 'skills.config.json valid',
+    title: "skills.config.json valid",
     success: configValid,
     message: configDetail,
   });
@@ -124,7 +143,7 @@ export async function performDoctorChecks(): Promise<DoctorCheckResult[]> {
  * Executes the `skills-manager-mcp doctor` CLI command.
  */
 export async function runDoctorCommand(): Promise<void> {
-  console.log('Skills Manager Doctor\n');
+  console.log("Skills Manager Doctor\n");
 
   const checks = await performDoctorChecks();
   let allHealthy = true;
@@ -138,10 +157,12 @@ export async function runDoctorCommand(): Promise<void> {
     }
   }
 
-  console.log('');
+  console.log("");
   if (allHealthy) {
-    console.log('Everything is healthy.');
+    console.log("Everything is healthy.");
   } else {
-    console.log('Issues detected. Run "skills-manager-mcp setup" to repair registration.');
+    console.log(
+      'Issues detected. Run "skills-manager-mcp setup" to repair registration.',
+    );
   }
 }
