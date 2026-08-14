@@ -13,7 +13,7 @@ import {
   isCursorMcpRegistered,
 } from "../services/cursorRegistry.js";
 import {
-  getClaudeCodeMcpConfigPath,
+  getClaudeMcpConfigPath,
   isClaudeCodeMcpRegistered,
 } from "../services/claudeCodeRegistry.js";
 import {
@@ -123,7 +123,7 @@ export async function performDoctorChecks(): Promise<DoctorCheckResult[]> {
   });
 
   // Check 3d: Claude Code MCP registration
-  const claudeCodeConfigPath = getClaudeCodeMcpConfigPath();
+  const claudeCodeConfigPath = getClaudeMcpConfigPath();
   const claudeCodeRegistered = await isClaudeCodeMcpRegistered();
   results.push({
     title: "Claude Code MCP registered",
