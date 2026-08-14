@@ -4,6 +4,18 @@ import fs from "node:fs/promises";
 import { getMcpServerIndexPath } from "./antigravityRegistry.js";
 
 /**
+ * Resolves the absolute path to the active Node.js executable.
+ * On Windows, GUI applications like Claude Desktop do not inherit terminal PATH
+ * environment variables, so providing the absolute path to `node.exe` is required.
+ */
+export function getNodeExecutablePath(): string {
+  if (process.execPath && path.isAbsolute(process.execPath)) {
+    return process.execPath;
+  }
+  return "node";
+}
+
+/**
  * Resolves all candidate paths to Claude Desktop's MCP configuration file.
  *
  * Claude Desktop (the GUI application) stores MCP server definitions in
@@ -127,6 +139,7 @@ export interface ClaudeDesktopRegistrationResult {
 async function registerIntoClaudeDesktopFile(
   configPath: string,
   serverIndexPath: string,
+  customNodeCommand?: string,
 ): Promise<boolean> {
   const configDir = path.dirname(configPath);
   await fs.mkdir(configDir, { recursive: true });
@@ -148,17 +161,18 @@ async function registerIntoClaudeDesktopFile(
     configData.mcpServers = {};
   }
 
+  const nodeCommand = customNodeCommand || getNodeExecutablePath();
   let newlyAdded = false;
   const existingEntry = configData.mcpServers["skills-manager"];
 
   if (
     !existingEntry ||
-    existingEntry.command !== "node" ||
+    existingEntry.command !== nodeCommand ||
     !Array.isArray(existingEntry.args) ||
     existingEntry.args[0] !== serverIndexPath
   ) {
     configData.mcpServers["skills-manager"] = {
-      command: "node",
+      command: nodeCommand,
       args: [serverIndexPath],
     };
     newlyAdded = true;
@@ -171,14 +185,17 @@ async function registerIntoClaudeDesktopFile(
 /**
  * Registers skills-manager-mcp into Claude Desktop's MCP configuration file(s).
  * Automatically detects standard and Windows Store packaged installations.
+ * Uses the absolute Node.js executable path on Windows for guaranteed execution.
  * Preserves all existing MCP server configurations and operates idempotently.
  *
  * @param customServerPath Optional custom path to dist/index.js
  * @param customConfigPath Optional custom path to a config file (for testing)
+ * @param customNodeCommand Optional custom node executable path
  */
 export async function registerClaudeDesktopMcp(
   customServerPath?: string,
   customConfigPath?: string,
+  customNodeCommand?: string,
 ): Promise<ClaudeDesktopRegistrationResult> {
   const targetPaths = customConfigPath
     ? [customConfigPath]
@@ -207,6 +224,7 @@ export async function registerClaudeDesktopMcp(
         const added = await registerIntoClaudeDesktopFile(
           targetPath,
           serverIndexPath,
+          customNodeCommand,
         );
         if (added) newlyAdded = true;
         registeredAtLeastOne = true;
@@ -224,6 +242,7 @@ export async function registerClaudeDesktopMcp(
       const added = await registerIntoClaudeDesktopFile(
         defaultPath,
         serverIndexPath,
+        customNodeCommand,
       );
       if (added) newlyAdded = true;
       registeredAtLeastOne = true;
@@ -290,7 +309,12 @@ export async function isClaudeDesktopMcpRegistered(
     try {
       const content = await fs.readFile(configPath, "utf-8");
       const parsed = JSON.parse(content);
-      if (parsed?.mcpServers?.["skills-manager"]) {
+      const entry = parsed?.mcpServers?.["skills-manager"];
+      if (
+        entry &&
+        (entry.command === "node" ||
+          entry.command.toLowerCase().includes("node"))
+      ) {
         return true;
       }
     } catch {
