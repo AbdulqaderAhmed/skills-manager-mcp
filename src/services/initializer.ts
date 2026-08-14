@@ -8,6 +8,12 @@ import {
   registerAntigravityMcp,
 } from "./antigravityRegistry.js";
 import { isVsCodeMcpRegistered, registerVsCodeMcp } from "./vscodeRegistry.js";
+import { isCursorMcpRegistered, registerCursorMcp } from "./cursorRegistry.js";
+import {
+  isClaudeCodeMcpRegistered,
+  registerClaudeCodeMcp,
+} from "./claudeCodeRegistry.js";
+import { isCodexMcpRegistered, registerCodexMcp } from "./codexRegistry.js";
 
 export interface InitializeOptions {
   silent?: boolean;
@@ -70,7 +76,12 @@ export async function isInitialized(
 
     // 4. Check VS Code MCP registration (only when not using a custom test config)
     if (!customConfigPath) {
-      return await isVsCodeMcpRegistered();
+      const vsCodeRegistered = await isVsCodeMcpRegistered();
+      if (!vsCodeRegistered) return false;
+
+      // 5. Check Cursor MCP registration (optional, as Cursor may not be installed)
+      // We don't require Cursor for initialization, but it's nice-to-have
+      // This prevents the initialization check from failing if Cursor isn't installed
     }
 
     return true;
@@ -127,6 +138,44 @@ export async function ensureInitialized(
 
   if (!options.silent) {
     console.log(`✓ VS Code MCP registered: ${vsCodeRegResult.configPaths[0]}`);
+  }
+
+  // 5. Automatically register MCP server in Cursor user mcp.json
+  const cursorRegResult = await registerCursorMcp(
+    options.customServerPath,
+    options.customConfigPath,
+  );
+
+  if (!options.silent) {
+    if (cursorRegResult.registered) {
+      console.log(`✓ Cursor IDE MCP registered: ${cursorRegResult.configPath}`);
+    }
+  }
+
+  // 6. Automatically register MCP server in Claude Code user mcp.json
+  const claudeCodeRegResult = await registerClaudeCodeMcp(
+    options.customServerPath,
+    options.customConfigPath,
+  );
+
+  if (!options.silent) {
+    if (claudeCodeRegResult.registered) {
+      console.log(
+        `✓ Claude Code MCP registered: ${claudeCodeRegResult.configPath}`,
+      );
+    }
+  }
+
+  // 7. Automatically register MCP server in Codex user mcp.json
+  const codexRegResult = await registerCodexMcp(
+    options.customServerPath,
+    options.customConfigPath,
+  );
+
+  if (!options.silent) {
+    if (codexRegResult.registered) {
+      console.log(`✓ Codex MCP registered: ${codexRegResult.configPath}`);
+    }
     console.log("\nInitialization complete.\n");
   }
 

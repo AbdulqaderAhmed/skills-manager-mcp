@@ -8,6 +8,9 @@ import {
   getAntigravityMcpConfigPath,
 } from "../services/antigravityRegistry.js";
 import { registerVsCodeMcp } from "../services/vscodeRegistry.js";
+import { registerCursorMcp } from "../services/cursorRegistry.js";
+import { registerClaudeCodeMcp } from "../services/claudeCodeRegistry.js";
+import { registerCodexMcp } from "../services/codexRegistry.js";
 
 // Re-export helper for external callers / tests
 export { getAntigravityMcpConfigPath, registerAntigravityMcp };
@@ -64,6 +67,40 @@ export async function runSetupCommand(): Promise<void> {
     console.log(`✓ VS Code MCP registered (${vsCodeRegResult.configPaths[0]})`);
   } catch (err: any) {
     console.error(`✗ VS Code MCP registration failed: ${err.message}`);
+  }
+
+  // 6. Register in Cursor IDE user mcp.json
+  try {
+    const cursorRegResult = await registerCursorMcp();
+    if (cursorRegResult.registered) {
+      console.log(
+        `✓ Cursor IDE MCP registered (${cursorRegResult.configPath})`,
+      );
+    }
+  } catch (err: any) {
+    console.error(`✗ Cursor IDE MCP registration failed: ${err.message}`);
+  }
+
+  // 7. Register in Claude Code user mcp.json
+  try {
+    const claudeCodeRegResult = await registerClaudeCodeMcp();
+    if (claudeCodeRegResult.registered) {
+      console.log(
+        `✓ Claude Code MCP registered (${claudeCodeRegResult.configPath})`,
+      );
+    }
+  } catch (err: any) {
+    console.error(`✗ Claude Code MCP registration failed: ${err.message}`);
+  }
+
+  // 8. Register in Codex user mcp.json
+  try {
+    const codexRegResult = await registerCodexMcp();
+    if (codexRegResult.registered) {
+      console.log(`✓ Codex MCP registered (${codexRegResult.configPath})`);
+    }
+  } catch (err: any) {
+    console.error(`✗ Codex MCP registration failed: ${err.message}`);
   }
 
   console.log("\nSetup completed successfully!");

@@ -8,6 +8,18 @@ import {
   getVsCodeMcpConfigPaths,
   isVsCodeMcpRegistered,
 } from "../services/vscodeRegistry.js";
+import {
+  getCursorMcpConfigPath,
+  isCursorMcpRegistered,
+} from "../services/cursorRegistry.js";
+import {
+  getClaudeCodeMcpConfigPath,
+  isClaudeCodeMcpRegistered,
+} from "../services/claudeCodeRegistry.js";
+import {
+  getCodexMcpConfigPath,
+  isCodexMcpRegistered,
+} from "../services/codexRegistry.js";
 import { CacheManager } from "../cacheManager.js";
 import { GlobalConfig } from "../globalConfig.js";
 
@@ -97,6 +109,39 @@ export async function performDoctorChecks(): Promise<DoctorCheckResult[]> {
     message: vsCodeRegistered
       ? getVsCodeMcpConfigPaths()[0]
       : `Missing in ${getVsCodeMcpConfigPaths()[0]} (run "skills-manager-mcp setup")`,
+  });
+
+  // Check 3c: Cursor IDE MCP registration
+  const cursorConfigPath = getCursorMcpConfigPath();
+  const cursorRegistered = await isCursorMcpRegistered();
+  results.push({
+    title: "Cursor IDE MCP registered",
+    success: cursorRegistered,
+    message: cursorRegistered
+      ? cursorConfigPath
+      : `Missing in ${cursorConfigPath} (run "skills-manager-mcp setup")`,
+  });
+
+  // Check 3d: Claude Code MCP registration
+  const claudeCodeConfigPath = getClaudeCodeMcpConfigPath();
+  const claudeCodeRegistered = await isClaudeCodeMcpRegistered();
+  results.push({
+    title: "Claude Code MCP registered",
+    success: claudeCodeRegistered,
+    message: claudeCodeRegistered
+      ? claudeCodeConfigPath
+      : `Missing in ${claudeCodeConfigPath} (run "skills-manager-mcp setup")`,
+  });
+
+  // Check 3e: Codex MCP registration
+  const codexConfigPath = getCodexMcpConfigPath();
+  const codexRegistered = await isCodexMcpRegistered();
+  results.push({
+    title: "Codex MCP registered",
+    success: codexRegistered,
+    message: codexRegistered
+      ? codexConfigPath
+      : `Missing in ${codexConfigPath} (run "skills-manager-mcp setup")`,
   });
 
   // Check 4: Global cache availability (~/.ai-skills/cache)

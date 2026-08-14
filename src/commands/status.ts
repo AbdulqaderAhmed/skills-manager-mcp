@@ -5,6 +5,9 @@ import { GlobalConfig } from "../globalConfig.js";
 import { CacheManager } from "../cacheManager.js";
 import { getAntigravityMcpConfigPath } from "./setup.js";
 import { isVsCodeMcpRegistered } from "../services/vscodeRegistry.js";
+import { isCursorMcpRegistered } from "../services/cursorRegistry.js";
+import { isClaudeCodeMcpRegistered } from "../services/claudeCodeRegistry.js";
+import { isCodexMcpRegistered } from "../services/codexRegistry.js";
 import { detectWorkspace } from "../workspace.js";
 import { SkillManager } from "../skillManager.js";
 
@@ -99,6 +102,36 @@ export async function runStatusCommand(providedPath?: string): Promise<void> {
   } else {
     console.log(
       'VS Code:\n✗ MCP not registered (run "skills-manager-mcp setup")\n',
+    );
+  }
+
+  // 3c. Cursor IDE MCP Registration
+  const isCursorRegistered = await isCursorMcpRegistered();
+  if (isCursorRegistered) {
+    console.log("Cursor IDE:\n✓ MCP registered\n");
+  } else {
+    console.log(
+      'Cursor IDE:\n✗ MCP not registered (run "skills-manager-mcp setup")\n',
+    );
+  }
+
+  // 3d. Claude Code MCP Registration
+  const isClaudeCodeRegistered = await isClaudeCodeMcpRegistered();
+  if (isClaudeCodeRegistered) {
+    console.log("Claude Code:\n✓ MCP registered\n");
+  } else {
+    console.log(
+      'Claude Code:\n✗ MCP not registered (run "skills-manager-mcp setup")\n',
+    );
+  }
+
+  // 3e. Codex MCP Registration
+  const isCodexRegistered = await isCodexMcpRegistered();
+  if (isCodexRegistered) {
+    console.log("Codex:\n✓ MCP registered\n");
+  } else {
+    console.log(
+      'Codex:\n✗ MCP not registered (run "skills-manager-mcp setup")\n',
     );
   }
 
