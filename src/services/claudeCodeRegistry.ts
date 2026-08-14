@@ -120,7 +120,10 @@ export async function registerClaudeCodeMcp(
   const serverIndexPath = customServerPath || getMcpServerIndexPath();
 
   try {
-    const newlyAdded = await registerIntoClaudeFile(targetPath, serverIndexPath);
+    const newlyAdded = await registerIntoClaudeFile(
+      targetPath,
+      serverIndexPath,
+    );
     return {
       registered: true,
       configPath: targetPath,
@@ -155,11 +158,7 @@ export async function unregisterClaudeCodeMcp(
 
     if (parsed && parsed.mcpServers && parsed.mcpServers["skills-manager"]) {
       delete parsed.mcpServers["skills-manager"];
-      await fs.writeFile(
-        targetPath,
-        JSON.stringify(parsed, null, 2),
-        "utf-8",
-      );
+      await fs.writeFile(targetPath, JSON.stringify(parsed, null, 2), "utf-8");
     }
   } catch {
     // Ignore if file doesn't exist

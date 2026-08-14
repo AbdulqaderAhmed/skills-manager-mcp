@@ -10,13 +10,13 @@ Claude supports Model Context Protocol (MCP) servers to extend its capabilities.
 
 Claude stores MCP configuration in multiple locations with a clear priority order:
 
-| Location | Purpose | Priority |
-|----------|---------|----------|
-| `~/.claude.json` | Main Claude configuration (recommended) | 1st |
-| `~/.claude/mcp_servers.json` | Dedicated MCP servers file | 2nd |
-| `~/.claude/settings.json` | User-specific global settings | 3rd |
-| `.claude/settings.local.json` | Project-specific local settings | Project |
-| `.mcp.json` | Project-scoped MCP configuration (version-controlled) | Project |
+| Location                      | Purpose                                               | Priority |
+| ----------------------------- | ----------------------------------------------------- | -------- |
+| `~/.claude.json`              | Main Claude configuration (recommended)               | 1st      |
+| `~/.claude/mcp_servers.json`  | Dedicated MCP servers file                            | 2nd      |
+| `~/.claude/settings.json`     | User-specific global settings                         | 3rd      |
+| `.claude/settings.local.json` | Project-specific local settings                       | Project  |
+| `.mcp.json`                   | Project-scoped MCP configuration (version-controlled) | Project  |
 
 ## Automatic Setup (Recommended)
 
@@ -28,6 +28,7 @@ skills-manager-mcp setup
 ```
 
 _Output:_
+
 ```
 Skills Manager MCP Setup
 
@@ -68,13 +69,16 @@ If you prefer to configure Claude manually, add the `skills-manager` entry to yo
   "mcpServers": {
     "skills-manager": {
       "command": "node",
-      "args": ["C:\\Users\\<username>\\AppData\\Roaming\\npm\\node_modules\\skills-manager-mcp\\dist\\index.js"]
+      "args": [
+        "C:\\Users\\<username>\\AppData\\Roaming\\npm\\node_modules\\skills-manager-mcp\\dist\\index.js"
+      ]
     }
   }
 }
 ```
 
 **On macOS/Linux:**
+
 ```json
 {
   "mcpServers": {
@@ -139,6 +143,7 @@ skills-manager-mcp status
 ```
 
 Expected output:
+
 ```
 Claude Code:
 ✓ MCP registered
@@ -160,15 +165,15 @@ Once configured:
 
 `skills-manager-mcp` exposes these tools to Claude:
 
-| Tool | Purpose |
-|------|---------|
-| `get_workspace_info` | Detects project workspace and configuration |
-| `bootstrap_project` | Initializes project: creates `.agents/skills`, installs configured skills |
-| `sync_skills` | Re-downloads all configured skills (updates) |
-| `install_skills` | Installs only missing skills |
-| `list_installed_skills` | Lists currently installed skills with metadata |
-| `check_missing_skills` | Audits which configured skills are missing |
-| `remove_skills` | Removes specified skills from project |
+| Tool                    | Purpose                                                                   |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `get_workspace_info`    | Detects project workspace and configuration                               |
+| `bootstrap_project`     | Initializes project: creates `.agents/skills`, installs configured skills |
+| `sync_skills`           | Re-downloads all configured skills (updates)                              |
+| `install_skills`        | Installs only missing skills                                              |
+| `list_installed_skills` | Lists currently installed skills with metadata                            |
+| `check_missing_skills`  | Audits which configured skills are missing                                |
+| `remove_skills`         | Removes specified skills from project                                     |
 
 ## Configuration Structure
 
@@ -194,6 +199,7 @@ Both global (`~/.ai-skills/skills.config.json`) and project-scoped (`./skills.co
 ```
 
 **Fields:**
+
 - `name` (required): Unique skill identifier
 - `repository` (required): Git HTTPS repository URL
 - `skill` (optional): Folder name in repo; defaults to `name` if omitted
@@ -204,11 +210,13 @@ Both global (`~/.ai-skills/skills.config.json`) and project-scoped (`./skills.co
 ### MCP server not connecting
 
 1. **Verify installation:**
+
    ```bash
    skills-manager-mcp status
    ```
 
 2. **Re-run setup:**
+
    ```bash
    skills-manager-mcp setup
    ```
@@ -222,11 +230,13 @@ Both global (`~/.ai-skills/skills.config.json`) and project-scoped (`./skills.co
 ### Skills not installing
 
 1. Check workspace detection:
+
    ```bash
    skills-manager-mcp status
    ```
 
 2. Run diagnostics:
+
    ```bash
    skills-manager-mcp doctor
    ```
@@ -238,14 +248,17 @@ Both global (`~/.ai-skills/skills.config.json`) and project-scoped (`./skills.co
 ## Platform Paths
 
 **macOS:**
+
 - Config: `~/.claude.json`
 - Cache: `~/.ai-skills/cache/`
 
 **Linux:**
+
 - Config: `~/.claude.json`
 - Cache: `~/.ai-skills/cache/`
 
 **Windows:**
+
 - Config: `%USERPROFILE%\.claude.json`
 - Cache: `%USERPROFILE%\.ai-skills\cache\`
 

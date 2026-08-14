@@ -96,6 +96,7 @@ skills-manager-mcp status
 ```
 
 This single command:
+
 1. Detects first-time installation
 2. Creates global storage at `~/.ai-skills/`
 3. Initializes the skill cache
@@ -140,16 +141,19 @@ The MCP server automatically registers with all VS Code variants during initiali
 **Configuration:** `mcp.json` (automatically updated)
 
 **Supported Variants:**
+
 - VS Code (stable)
 - VS Code Insiders
 - VSCodium
 
 **Paths by Platform:**
+
 - **Windows**: `%APPDATA%\Code\User\mcp.json`
 - **macOS**: `~/Library/Application Support/Code/User/mcp.json`
 - **Linux**: `~/.config/Code/User/mcp.json`
 
 **Configuration Format:**
+
 ```json
 {
   "servers": {
@@ -163,6 +167,7 @@ The MCP server automatically registers with all VS Code variants during initiali
 ```
 
 **Usage in VS Code:**
+
 1. Open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
 2. Search "MCP: List Servers"
 3. Select and start `skills-manager`
@@ -175,11 +180,13 @@ The MCP server automatically registers with Claude's primary configuration file.
 **Configuration:** `~/.claude.json` (recommended by Claude)
 
 **Alternative Locations (priority order):**
+
 - `~/.claude/mcp_servers.json` — Dedicated MCP file
 - `~/.claude/settings.json` — User-specific settings
 - `.mcp.json` — Project-scoped (version-controlled, requires enablement)
 
 **Configuration Format:**
+
 ```json
 {
   "mcpServers": {
@@ -192,6 +199,7 @@ The MCP server automatically registers with Claude's primary configuration file.
 ```
 
 **Paths by Platform:**
+
 - **All Platforms**: `~/.claude.json`
 - **Windows Alternative**: `%USERPROFILE%\.claude.json`
 
@@ -204,6 +212,7 @@ Cursor IDE uses the same configuration format as VS Code.
 **Configuration:** `mcp.json` (automatically updated)
 
 **Paths by Platform:**
+
 - **Windows**: `%APPDATA%\Cursor\User\mcp.json`
 - **macOS**: `~/Library/Application Support/Cursor/User/mcp.json`
 - **Linux**: `~/.config/Cursor/User/mcp.json`
@@ -215,6 +224,7 @@ Codex uses the same configuration format as VS Code.
 **Configuration:** `mcp.json` (automatically updated)
 
 **Paths by Platform:**
+
 - **Windows**: `%APPDATA%\Codex\User\mcp.json`
 - **macOS**: `~/Library/Application Support/Codex/User/mcp.json`
 - **Linux**: `~/.config/Codex/User/mcp.json`
@@ -224,10 +234,12 @@ Codex uses the same configuration format as VS Code.
 Antigravity Desktop is the primary MCP target with specialized registration.
 
 **Configuration Files:**
+
 - `~/.gemini/config/mcp_config.json` — Primary
 - `~/.gemini/antigravity-ide/mcp.json` — Secondary
 
 **Configuration Format:**
+
 ```json
 {
   "mcpServers": {
@@ -249,11 +261,13 @@ Antigravity Desktop is the primary MCP target with specialized registration.
 Displays a comprehensive status dashboard including configuration, cache statistics, MCP registration status across all editors, workspace detection, and installed skills.
 
 **Usage:**
+
 ```bash
 skills-manager-mcp status [projectPath]
 ```
 
 **Output Includes:**
+
 - Global configuration presence
 - Cache skill count
 - MCP registration status per editor
@@ -265,11 +279,13 @@ skills-manager-mcp status [projectPath]
 Runs comprehensive diagnostic health checks on installation, configuration, cache, and MCP registration.
 
 **Usage:**
+
 ```bash
 skills-manager-mcp doctor
 ```
 
 **Checks Performed:**
+
 - ✓ dist/index.js exists and is valid
 - ✓ Antigravity configuration file
 - ✓ MCP path validity and file existence
@@ -281,6 +297,7 @@ skills-manager-mcp doctor
 - ✓ skills.config.json validity
 
 **Sample Output:**
+
 ```
 Skills Manager Doctor
 
@@ -300,11 +317,13 @@ Everything is healthy.
 Initializes a project workspace for skill management.
 
 **Usage:**
+
 ```bash
 skills-manager-mcp bootstrap [projectPath]
 ```
 
 **Operations:**
+
 1. Detects or validates workspace root
 2. Creates `.agents/skills/` directory structure
 3. Loads and merges project and global skill configurations
@@ -313,6 +332,7 @@ skills-manager-mcp bootstrap [projectPath]
 6. Generates detailed installation report
 
 **Output Example:**
+
 ```
 Workspace: /path/to/project [Source: package.json]
 
@@ -330,11 +350,13 @@ Failed: 0
 Synchronizes workspace skills with global personal collection.
 
 **Usage:**
+
 ```bash
 skills-manager-mcp sync [projectPath]
 ```
 
 **Operations:**
+
 - Fetches latest global skill configuration
 - Re-downloads all configured skills (updates)
 - Updates metadata and cache
@@ -347,11 +369,13 @@ skills-manager-mcp sync [projectPath]
 Installs only missing skills, skipping already-installed ones.
 
 **Usage:**
+
 ```bash
 skills-manager-mcp install [projectPath]
 ```
 
 **Useful for:**
+
 - Adding new skills to an existing project
 - Recovering from partial installations
 - CI/CD pipelines requiring idempotent operations
@@ -361,6 +385,7 @@ skills-manager-mcp install [projectPath]
 Removes specified skills from the project workspace.
 
 **Usage:**
+
 ```bash
 # Remove single skill
 skills-manager-mcp remove find-skills
@@ -374,9 +399,11 @@ skills-manager-mcp remove find-skills -c
 ```
 
 **Options:**
+
 - `--from-config`, `-c` — Also remove skill entries from `skills.config.json`
 
 **Output Example:**
+
 ```
 Removed: 1
 - find-skills
@@ -390,11 +417,13 @@ Failed: 0
 Manually re-run setup and MCP registration for all editors.
 
 **Usage:**
+
 ```bash
 skills-manager-mcp setup
 ```
 
 **Useful for:**
+
 - Re-registering after editor installation
 - Fixing MCP configuration issues
 - Manual initialization on different platforms
@@ -449,12 +478,12 @@ Override or extend global configuration per project:
 
 ### Configuration Schema
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | ✓ | Unique skill identifier (alphanumeric, hyphens, underscores) |
-| `repository` | string | ✓ | Git HTTPS repository URL containing skill(s) |
-| `skill` | string | | Folder name in repository; defaults to `name` |
-| `type` | string | | `'skill'` (default) or `'bundle'` |
+| Field        | Type   | Required | Description                                                  |
+| ------------ | ------ | -------- | ------------------------------------------------------------ |
+| `name`       | string | ✓        | Unique skill identifier (alphanumeric, hyphens, underscores) |
+| `repository` | string | ✓        | Git HTTPS repository URL containing skill(s)                 |
+| `skill`      | string |          | Folder name in repository; defaults to `name`                |
+| `type`       | string |          | `'skill'` (default) or `'bundle'`                            |
 
 ### Metadata Tracker (`.agents/skills-manager.json`)
 
@@ -485,15 +514,15 @@ Automatically maintained project metadata:
 
 When running within VS Code (Copilot Chat agent mode), Claude, or Antigravity Desktop, the following MCP tools are available:
 
-| Tool | Purpose |
-|------|---------|
-| `get_workspace_info` | Diagnose workspace detection and configuration |
-| `bootstrap_project` | Initialize project with skills |
-| `sync_skills` | Update skills from global collection |
-| `install_skills` | Install missing skills only |
-| `remove_skills` | Remove skills from project |
-| `list_installed_skills` | Audit current installation |
-| `check_missing_skills` | Validate skill completeness |
+| Tool                    | Purpose                                        |
+| ----------------------- | ---------------------------------------------- |
+| `get_workspace_info`    | Diagnose workspace detection and configuration |
+| `bootstrap_project`     | Initialize project with skills                 |
+| `sync_skills`           | Update skills from global collection           |
+| `install_skills`        | Install missing skills only                    |
+| `remove_skills`         | Remove skills from project                     |
+| `list_installed_skills` | Audit current installation                     |
+| `check_missing_skills`  | Validate skill completeness                    |
 
 ---
 
@@ -533,6 +562,7 @@ When running within VS Code (Copilot Chat agent mode), Claude, or Antigravity De
 **Symptom:** Editor doesn't recognize the MCP server.
 
 **Solution:**
+
 1. Run diagnostics:
    ```bash
    skills-manager-mcp doctor
@@ -549,6 +579,7 @@ When running within VS Code (Copilot Chat agent mode), Claude, or Antigravity De
 **Symptom:** Error during `bootstrap` or `install`.
 
 **Solution:**
+
 1. Verify workspace detection:
    ```bash
    skills-manager-mcp status
@@ -563,6 +594,7 @@ When running within VS Code (Copilot Chat agent mode), Claude, or Antigravity De
 **Symptom:** `status` shows incorrect or no workspace.
 
 **Solution:**
+
 1. Run with explicit path:
    ```bash
    skills-manager-mcp bootstrap /path/to/project
@@ -575,6 +607,7 @@ When running within VS Code (Copilot Chat agent mode), Claude, or Antigravity De
 **Symptom:** Skill installation is slow or cached versions are stale.
 
 **Solution:**
+
 1. Clear cache manually:
    ```bash
    rm -rf ~/.ai-skills/cache
