@@ -14,6 +14,9 @@ import {
   registerClaudeCodeMcp,
 } from "./claudeCodeRegistry.js";
 import { isCodexMcpRegistered, registerCodexMcp } from "./codexRegistry.js";
+import {
+  registerClaudeDesktopMcp,
+} from "./claudeDesktopRegistry.js";
 
 export interface InitializeOptions {
   silent?: boolean;
@@ -152,7 +155,21 @@ export async function ensureInitialized(
     }
   }
 
-  // 6. Automatically register MCP server in Claude Code user mcp.json
+  // 6. Automatically register MCP server in Claude Desktop (claude_desktop_config.json)
+  const claudeDesktopRegResult = await registerClaudeDesktopMcp(
+    options.customServerPath,
+    options.customConfigPath,
+  );
+
+  if (!options.silent) {
+    if (claudeDesktopRegResult.registered) {
+      console.log(
+        `✓ Claude Desktop MCP registered: ${claudeDesktopRegResult.configPath}`,
+      );
+    }
+  }
+
+  // 7. Automatically register MCP server in Claude Code user (~/.claude.json)
   const claudeCodeRegResult = await registerClaudeCodeMcp(
     options.customServerPath,
     options.customConfigPath,
@@ -166,7 +183,7 @@ export async function ensureInitialized(
     }
   }
 
-  // 7. Automatically register MCP server in Codex user mcp.json
+  // 8. Automatically register MCP server in Codex CLI (~/.codex/config.toml)
   const codexRegResult = await registerCodexMcp(
     options.customServerPath,
     options.customConfigPath,

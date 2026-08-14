@@ -7,6 +7,7 @@ import { getAntigravityMcpConfigPath } from "./setup.js";
 import { isVsCodeMcpRegistered } from "../services/vscodeRegistry.js";
 import { isCursorMcpRegistered } from "../services/cursorRegistry.js";
 import { isClaudeCodeMcpRegistered } from "../services/claudeCodeRegistry.js";
+import { isClaudeDesktopMcpRegistered } from "../services/claudeDesktopRegistry.js";
 import { isCodexMcpRegistered } from "../services/codexRegistry.js";
 import { detectWorkspace } from "../workspace.js";
 import { SkillManager } from "../skillManager.js";
@@ -115,7 +116,17 @@ export async function runStatusCommand(providedPath?: string): Promise<void> {
     );
   }
 
-  // 3d. Claude Code MCP Registration
+  // 3d. Claude Desktop MCP Registration
+  const isClaudeDesktopRegistered = await isClaudeDesktopMcpRegistered();
+  if (isClaudeDesktopRegistered) {
+    console.log("Claude Desktop:\n✓ MCP registered\n");
+  } else {
+    console.log(
+      'Claude Desktop:\n✗ MCP not registered (run "skills-manager-mcp setup")\n',
+    );
+  }
+
+  // 3e. Claude Code MCP Registration
   const isClaudeCodeRegistered = await isClaudeCodeMcpRegistered();
   if (isClaudeCodeRegistered) {
     console.log("Claude Code:\n✓ MCP registered\n");

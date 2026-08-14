@@ -17,6 +17,10 @@ import {
   isClaudeCodeMcpRegistered,
 } from "../services/claudeCodeRegistry.js";
 import {
+  getClaudeDesktopMcpConfigPath,
+  isClaudeDesktopMcpRegistered,
+} from "../services/claudeDesktopRegistry.js";
+import {
   getCodexMcpConfigPath,
   isCodexMcpRegistered,
 } from "../services/codexRegistry.js";
@@ -122,7 +126,18 @@ export async function performDoctorChecks(): Promise<DoctorCheckResult[]> {
       : `Missing in ${cursorConfigPath} (run "skills-manager-mcp setup")`,
   });
 
-  // Check 3d: Claude Code MCP registration
+  // Check 3d: Claude Desktop MCP registration
+  const claudeDesktopConfigPath = getClaudeDesktopMcpConfigPath();
+  const claudeDesktopRegistered = await isClaudeDesktopMcpRegistered();
+  results.push({
+    title: "Claude Desktop MCP registered",
+    success: claudeDesktopRegistered,
+    message: claudeDesktopRegistered
+      ? claudeDesktopConfigPath
+      : `Missing in ${claudeDesktopConfigPath} (run "skills-manager-mcp setup")`,
+  });
+
+  // Check 3e: Claude Code MCP registration
   const claudeCodeConfigPath = getClaudeMcpConfigPath();
   const claudeCodeRegistered = await isClaudeCodeMcpRegistered();
   results.push({
@@ -133,7 +148,7 @@ export async function performDoctorChecks(): Promise<DoctorCheckResult[]> {
       : `Missing in ${claudeCodeConfigPath} (run "skills-manager-mcp setup")`,
   });
 
-  // Check 3e: Codex MCP registration
+  // Check 3f: Codex MCP registration
   const codexConfigPath = getCodexMcpConfigPath();
   const codexRegistered = await isCodexMcpRegistered();
   results.push({

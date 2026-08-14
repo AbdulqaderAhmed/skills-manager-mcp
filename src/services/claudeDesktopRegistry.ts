@@ -4,22 +4,46 @@ import fs from "node:fs/promises";
 import { getMcpServerIndexPath } from "./antigravityRegistry.js";
 
 /**
- * Resolves the path to Cursor IDE's user-level MCP configuration file.
+ * Resolves the path to Claude Desktop's MCP configuration file.
  *
- * Cursor IDE stores MCP server definitions in `~/.cursor/mcp.json`:
- *   - All platforms: ~/.cursor/mcp.json
+ * Claude Desktop (the GUI application) stores MCP server definitions in
+ * `claude_desktop_config.json` within the OS-specific application support folder:
+ *   - Windows: %APPDATA%\Claude\claude_desktop_config.json
+ *   - macOS:   ~/Library/Application Support/Claude/claude_desktop_config.json
+ *   - Linux:   ~/.config/Claude/claude_desktop_config.json
  *
- * Cursor uses the `mcpServers` top-level key (same as Claude).
- * Project-level configuration lives at `.cursor/mcp.json` in the project root.
+ * This is SEPARATE from Claude Code (the terminal CLI), which uses `~/.claude.json`.
  *
- * @see https://docs.cursor.com/context/model-context-protocol
+ * The file uses a `mcpServers` key at the top level to define MCP servers.
+ *
+ * @see https://modelcontextprotocol.io/quickstart/user
  */
-export function getCursorMcpConfigPath(): string {
+export function getClaudeDesktopMcpConfigPath(): string {
   const home = os.homedir();
-  return path.join(home, ".cursor", "mcp.json");
+  const platform = os.platform();
+
+  if (platform === "win32") {
+    const appData =
+      process.env.APPDATA || path.join(home, "AppData", "Roaming");
+    return path.join(appData, "Claude", "claude_desktop_config.json");
+  }
+
+  if (platform === "darwin") {
+    return path.join(
+      home,
+      "Library",
+      "Application Support",
+      "Claude",
+      "claude_desktop_config.json",
+    );
+  }
+
+  // Linux / other Unix
+  const configHome = process.env.XDG_CONFIG_HOME || path.join(home, ".config");
+  return path.join(configHome, "Claude", "claude_desktop_config.json");
 }
 
-export interface CursorRegistrationResult {
+export interface ClaudeDesktopRegistrationResult {
   registered: boolean;
   configPath: string;
   serverIndexPath: string;
@@ -27,12 +51,12 @@ export interface CursorRegistrationResult {
 }
 
 /**
- * Helper to register skills-manager into Cursor's mcp.json file.
- * Cursor uses the `mcpServers` top-level key.
+ * Helper to register skills-manager into Claude Desktop's configuration file.
+ * Claude Desktop uses `mcpServers` key at the top level.
  *
  * @returns True if the entry was newly added or updated, false if already current.
  */
-async function registerIntoCursorFile(
+async function registerIntoClaudeDesktopFile(
   configPath: string,
   serverIndexPath: string,
 ): Promise<boolean> {
@@ -51,6 +75,7 @@ async function registerIntoCursorFile(
     // File doesn't exist yet or contains invalid JSON
   }
 
+  // Ensure mcpServers object exists at top level
   if (!configData.mcpServers || typeof configData.mcpServers !== "object") {
     configData.mcpServers = {};
   }
@@ -76,21 +101,22 @@ async function registerIntoCursorFile(
 }
 
 /**
- * Registers skills-manager-mcp into Cursor's user-level mcp.json file.
+ * Registers skills-manager-mcp into Claude Desktop's MCP configuration file.
+ * Uses the OS-specific `claude_desktop_config.json` location.
  * Preserves all existing MCP server configurations and operates idempotently.
  *
  * @param customServerPath Optional custom path to dist/index.js
- * @param customConfigPath Optional custom path to a single mcp.json file (for testing)
+ * @param customConfigPath Optional custom path to a config file (for testing)
  */
-export async function registerCursorMcp(
+export async function registerClaudeDesktopMcp(
   customServerPath?: string,
   customConfigPath?: string,
-): Promise<CursorRegistrationResult> {
-  const targetPath = customConfigPath || getCursorMcpConfigPath();
+): Promise<ClaudeDesktopRegistrationResult> {
+  const targetPath = customConfigPath || getClaudeDesktopMcpConfigPath();
   const serverIndexPath = customServerPath || getMcpServerIndexPath();
 
   try {
-    const newlyAdded = await registerIntoCursorFile(
+    const newlyAdded = await registerIntoClaudeDesktopFile(
       targetPath,
       serverIndexPath,
     );
@@ -101,7 +127,7 @@ export async function registerCursorMcp(
       newlyAdded,
     };
   } catch {
-    // If registration fails (e.g., Cursor not installed), return a non-critical result
+    // If registration fails (e.g., Claude Desktop not installed), return a non-critical result
     return {
       registered: false,
       configPath: targetPath,
@@ -112,15 +138,15 @@ export async function registerCursorMcp(
 }
 
 /**
- * Removes the skills-manager MCP server entry from Cursor's mcp.json file.
+ * Removes the skills-manager MCP server entry from Claude Desktop's configuration.
  * Preserves all other user MCP servers.
  *
- * @param customConfigPath Optional custom path to a single mcp.json file (for testing)
+ * @param customConfigPath Optional custom path to a config file (for testing)
  */
-export async function unregisterCursorMcp(
+export async function unregisterClaudeDesktopMcp(
   customConfigPath?: string,
 ): Promise<{ unregistered: boolean; configPath: string }> {
-  const targetPath = customConfigPath || getCursorMcpConfigPath();
+  const targetPath = customConfigPath || getClaudeDesktopMcpConfigPath();
 
   try {
     const existingContent = await fs.readFile(targetPath, "utf-8");
@@ -138,12 +164,12 @@ export async function unregisterCursorMcp(
 }
 
 /**
- * Checks whether skills-manager is registered in Cursor's mcp.json file.
+ * Checks whether skills-manager is registered in Claude Desktop's configuration.
  */
-export async function isCursorMcpRegistered(
+export async function isClaudeDesktopMcpRegistered(
   customConfigPath?: string,
 ): Promise<boolean> {
-  const configPath = customConfigPath || getCursorMcpConfigPath();
+  const configPath = customConfigPath || getClaudeDesktopMcpConfigPath();
 
   try {
     const content = await fs.readFile(configPath, "utf-8");

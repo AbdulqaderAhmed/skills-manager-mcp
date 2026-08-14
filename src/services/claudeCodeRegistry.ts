@@ -4,19 +4,14 @@ import fs from "node:fs/promises";
 import { getMcpServerIndexPath } from "./antigravityRegistry.js";
 
 /**
- * Resolves the path to Claude's main MCP configuration file.
+ * Resolves the path to Claude Code's (terminal CLI) MCP configuration file.
  *
- * Claude stores MCP server definitions in multiple locations (in priority order):
- *   - `~/.claude.json` (main configuration, recommended by Claude)
- *   - `~/.claude/mcp_servers.json` (dedicated MCP file)
- *   - `~/.claude/settings.json` (user-specific global settings)
- *
- * We use `~/.claude.json` as the primary location for global MCP registration.
- * This is Claude's recommended location for reliability.
- *
- * Configuration structure for Claude uses `mcpServers` key (not `servers` like VS Code):
+ * Claude Code stores user-level MCP server definitions in `~/.claude.json`
+ * with the following structure:
  * ```json
  * {
+ *   "preferences": { ... },
+ *   "coworkUserFilesPath": "...",
  *   "mcpServers": {
  *     "skills-manager": {
  *       "command": "node",
@@ -25,6 +20,17 @@ import { getMcpServerIndexPath } from "./antigravityRegistry.js";
  *   }
  * }
  * ```
+ *
+ * The mcpServers key is added at the same level as preferences and coworkUserFilesPath.
+ *
+ * NOTE: This is for **Claude Code** (the terminal-based CLI agent), NOT for
+ * **Claude Desktop** (the GUI application). Claude Desktop uses a separate
+ * config file at `%APPDATA%\Claude\claude_desktop_config.json` — see
+ * `claudeDesktopRegistry.ts` for that.
+ *
+ * Project-level MCP servers can also be defined in `.mcp.json` in the project root.
+ *
+ * @see https://docs.anthropic.com/en/docs/claude-code
  */
 export function getClaudeMcpConfigPath(): string {
   const home = os.homedir();
@@ -32,17 +38,12 @@ export function getClaudeMcpConfigPath(): string {
 }
 
 /**
- * Returns alternative Claude MCP configuration paths (fallback locations).
+ * Returns Claude Code configuration paths.
+ * Only `~/.claude.json` is used for user-level MCP configuration.
  */
 export function getClaudeMcpConfigPaths(): string[] {
   const home = os.homedir();
-  const claudeDir = path.join(home, ".claude");
-
-  return [
-    path.join(home, ".claude.json"),
-    path.join(claudeDir, "mcp_servers.json"),
-    path.join(claudeDir, "settings.json"),
-  ];
+  return [path.join(home, ".claude.json")];
 }
 
 export interface ClaudeCodeRegistrationResult {
@@ -53,8 +54,8 @@ export interface ClaudeCodeRegistrationResult {
 }
 
 /**
- * Helper to register skills-manager into Claude's configuration file.
- * Claude uses `mcpServers` key (not `servers` like VS Code).
+ * Helper to register skills-manager into Claude Code's configuration file.
+ * Claude Code uses `mcpServers` key at the top level, alongside preferences.
  *
  * @returns True if the entry was newly added or updated, false if already current.
  */
@@ -77,7 +78,7 @@ async function registerIntoClaudeFile(
     // File doesn't exist yet or contains invalid JSON
   }
 
-  // Claude uses `mcpServers` key for MCP configurations (not `servers`)
+  // Ensure mcpServers object exists at top level (alongside preferences, coworkUserFilesPath, etc)
   if (!configData.mcpServers || typeof configData.mcpServers !== "object") {
     configData.mcpServers = {};
   }
@@ -103,11 +104,10 @@ async function registerIntoClaudeFile(
 }
 
 /**
- * Registers skills-manager-mcp into Claude's global MCP configuration.
- * Uses `~/.claude.json` as the primary location (Claude's recommended file).
- * Preserves all existing MCP server configurations and operates idempotently.
- *
- * Configuration is stored in the `mcpServers` key within the main Claude config.
+ * Registers skills-manager-mcp into Claude Code's MCP configuration.
+ * Uses `~/.claude.json` as the standard location.
+ * Adds mcpServers entry alongside existing preferences and configuration.
+ * Operates idempotently - safe to run multiple times.
  *
  * @param customServerPath Optional custom path to dist/index.js
  * @param customConfigPath Optional custom path to a config file (for testing)
@@ -131,7 +131,7 @@ export async function registerClaudeCodeMcp(
       newlyAdded,
     };
   } catch {
-    // If registration fails (e.g., Claude not installed), return a non-critical result
+    // If registration fails, return a non-critical result
     return {
       registered: false,
       configPath: targetPath,
@@ -142,8 +142,8 @@ export async function registerClaudeCodeMcp(
 }
 
 /**
- * Removes the skills-manager MCP server entry from Claude's configuration.
- * Preserves all other user MCP servers.
+ * Removes the skills-manager MCP server entry from Claude Code's configuration.
+ * Preserves all other user MCP servers and preferences.
  *
  * @param customConfigPath Optional custom path to a config file (for testing)
  */
@@ -168,7 +168,7 @@ export async function unregisterClaudeCodeMcp(
 }
 
 /**
- * Checks whether skills-manager is registered in Claude's MCP configuration.
+ * Checks whether skills-manager is registered in Claude Code's MCP configuration.
  */
 export async function isClaudeCodeMcpRegistered(
   customConfigPath?: string,

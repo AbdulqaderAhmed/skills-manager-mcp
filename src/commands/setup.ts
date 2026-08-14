@@ -10,6 +10,7 @@ import {
 import { registerVsCodeMcp } from "../services/vscodeRegistry.js";
 import { registerCursorMcp } from "../services/cursorRegistry.js";
 import { registerClaudeCodeMcp } from "../services/claudeCodeRegistry.js";
+import { registerClaudeDesktopMcp } from "../services/claudeDesktopRegistry.js";
 import { registerCodexMcp } from "../services/codexRegistry.js";
 
 // Re-export helper for external callers / tests
@@ -69,7 +70,7 @@ export async function runSetupCommand(): Promise<void> {
     console.error(`✗ VS Code MCP registration failed: ${err.message}`);
   }
 
-  // 6. Register in Cursor IDE user mcp.json
+  // 6. Register in Cursor IDE user mcp.json (~/.cursor/mcp.json)
   try {
     const cursorRegResult = await registerCursorMcp();
     if (cursorRegResult.registered) {
@@ -81,7 +82,19 @@ export async function runSetupCommand(): Promise<void> {
     console.error(`✗ Cursor IDE MCP registration failed: ${err.message}`);
   }
 
-  // 7. Register in Claude Code user mcp.json
+  // 7. Register in Claude Desktop (claude_desktop_config.json)
+  try {
+    const claudeDesktopRegResult = await registerClaudeDesktopMcp();
+    if (claudeDesktopRegResult.registered) {
+      console.log(
+        `✓ Claude Desktop MCP registered (${claudeDesktopRegResult.configPath})`,
+      );
+    }
+  } catch (err: any) {
+    console.error(`✗ Claude Desktop MCP registration failed: ${err.message}`);
+  }
+
+  // 8. Register in Claude Code (~/.claude.json)
   try {
     const claudeCodeRegResult = await registerClaudeCodeMcp();
     if (claudeCodeRegResult.registered) {
@@ -93,7 +106,7 @@ export async function runSetupCommand(): Promise<void> {
     console.error(`✗ Claude Code MCP registration failed: ${err.message}`);
   }
 
-  // 8. Register in Codex user mcp.json
+  // 9. Register in Codex CLI (~/.codex/config.toml)
   try {
     const codexRegResult = await registerCodexMcp();
     if (codexRegResult.registered) {

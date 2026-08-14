@@ -1,34 +1,36 @@
 # Claude MCP Configuration Guide
 
-This guide explains how to set up and use `skills-manager-mcp` with Claude.
+This guide explains how to set up and use `skills-manager-mcp` with **Claude Desktop** (the GUI application) and **Claude Code** (the terminal CLI agent).
 
 ## Overview
 
 Claude supports Model Context Protocol (MCP) servers to extend its capabilities. The `skills-manager-mcp` server provides Claude with access to AI agent skills and bundles, automatically managing skill installation and organization across your projects.
 
-## Configuration Files & Locations
+> **Important:** Claude Desktop and Claude Code use **different** configuration files. Make sure you configure the right one for the tool you're using.
 
-Claude stores MCP configuration in multiple locations with a clear priority order:
+## Quick Comparison
 
-| Location                      | Purpose                                               | Priority |
-| ----------------------------- | ----------------------------------------------------- | -------- |
-| `~/.claude.json`              | Main Claude configuration (recommended)               | 1st      |
-| `~/.claude/mcp_servers.json`  | Dedicated MCP servers file                            | 2nd      |
-| `~/.claude/settings.json`     | User-specific global settings                         | 3rd      |
-| `.claude/settings.local.json` | Project-specific local settings                       | Project  |
-| `.mcp.json`                   | Project-scoped MCP configuration (version-controlled) | Project  |
+| Feature | Claude Desktop (GUI App) | Claude Code (Terminal CLI) |
+| --- | --- | --- |
+| **Config File** | `claude_desktop_config.json` | `~/.claude.json` |
+| **JSON Key** | `mcpServers` | `mcpServers` |
+| **Windows Path** | `%APPDATA%\Claude\claude_desktop_config.json` | `%USERPROFILE%\.claude.json` |
+| **macOS Path** | `~/Library/Application Support/Claude/claude_desktop_config.json` | `~/.claude.json` |
+| **Linux Path** | `~/.config/Claude/claude_desktop_config.json` | `~/.claude.json` |
+| **Project-level** | No | Yes (`.mcp.json` in project root) |
+
+---
 
 ## Automatic Setup (Recommended)
 
-When you install `skills-manager-mcp` globally and run any command, the first-run initialization automatically registers with Claude:
+When you install `skills-manager-mcp` globally and run the setup command, it automatically registers with **both** Claude Desktop and Claude Code:
 
 ```bash
 npm install -g skills-manager-mcp
 skills-manager-mcp setup
 ```
 
-_Output:_
-
+**Output:**
 ```
 Skills Manager MCP Setup
 
@@ -38,61 +40,26 @@ Skills Manager MCP Setup
 ✓ Created default global skills collection: C:\Users\<username>\.ai-skills\skills.config.json
 ✓ Antigravity MCP registered: C:\Users\<username>\.gemini\config\mcp_config.json
 ✓ VS Code MCP registered: C:\Users\<username>\AppData\Roaming\Code\User\mcp.json
+✓ Cursor IDE MCP registered: C:\Users\<username>\.cursor\mcp.json
+✓ Claude Desktop MCP registered: C:\Users\<username>\AppData\Roaming\Claude\claude_desktop_config.json
 ✓ Claude Code MCP registered: C:\Users\<username>\.claude.json
-✓ Cursor IDE MCP registered: C:\Users\<username>\AppData\Roaming\Cursor\User\mcp.json
-✓ Codex MCP registered: C:\Users\<username>\AppData\Roaming\Codex\User\mcp.json
+✓ Codex MCP registered: C:\Users\<username>\.codex\config.toml
 
 Setup completed successfully!
 ```
 
-The registration creates the following configuration in `~/.claude.json`:
+The setup command will:
+1. Create config files if they don't exist (or preserve existing content)
+2. Add the `mcpServers` section with the `skills-manager` entry
+3. Preserve all existing preferences and configuration
 
-```json
-{
-  "mcpServers": {
-    "skills-manager": {
-      "command": "node",
-      "args": ["/path/to/dist/index.js"]
-    }
-  }
-}
-```
+---
 
-## Manual Configuration
+## Claude Desktop Configuration
 
-If you prefer to configure Claude manually, add the `skills-manager` entry to your Claude configuration:
+Claude Desktop stores MCP server definitions in `claude_desktop_config.json` within the OS-specific application support folder.
 
-### Option 1: Global Configuration (`~/.claude.json`)
-
-```json
-{
-  "mcpServers": {
-    "skills-manager": {
-      "command": "node",
-      "args": [
-        "C:\\Users\\<username>\\AppData\\Roaming\\npm\\node_modules\\skills-manager-mcp\\dist\\index.js"
-      ]
-    }
-  }
-}
-```
-
-**On macOS/Linux:**
-
-```json
-{
-  "mcpServers": {
-    "skills-manager": {
-      "command": "node",
-      "args": ["/usr/local/lib/node_modules/skills-manager-mcp/dist/index.js"]
-    }
-  }
-}
-```
-
-### Option 2: Project-Scoped Configuration (`.mcp.json`)
-
-Create a `.mcp.json` file in your project root:
+### File Structure
 
 ```json
 {
@@ -105,165 +72,318 @@ Create a `.mcp.json` file in your project root:
 }
 ```
 
-Then enable project MCP servers in `.claude/settings.json`:
+### Manual Configuration
+
+#### Windows
+
+Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 
 ```json
 {
-  "enableAllProjectMcpServers": true
-}
-```
-
-Or whitelist specific servers:
-
-```json
-{
-  "enabledMcpjsonServers": ["skills-manager"]
-}
-```
-
-## Verifying Configuration
-
-Check if `skills-manager-mcp` is correctly registered:
-
-```bash
-skills-manager-mcp doctor
-```
-
-Look for the "Claude Code MCP registered" check to confirm:
-
-```
-✓ Claude Code MCP registered
-  ~/.claude.json
-```
-
-Also verify with the status command:
-
-```bash
-skills-manager-mcp status
-```
-
-Expected output:
-
-```
-Claude Code:
-✓ MCP registered
-```
-
-## Using with Claude
-
-Once configured:
-
-1. **Start Claude** with your project open
-2. **Claude will automatically load** the skills-manager MCP server
-3. **Use Claude's chat** to interact with skills:
-   - "Bootstrap my project with skills"
-   - "What skills are installed?"
-   - "Install the code-review skill"
-   - "Sync my skills with the global collection"
-
-## Available Tools
-
-`skills-manager-mcp` exposes these tools to Claude:
-
-| Tool                    | Purpose                                                                   |
-| ----------------------- | ------------------------------------------------------------------------- |
-| `get_workspace_info`    | Detects project workspace and configuration                               |
-| `bootstrap_project`     | Initializes project: creates `.agents/skills`, installs configured skills |
-| `sync_skills`           | Re-downloads all configured skills (updates)                              |
-| `install_skills`        | Installs only missing skills                                              |
-| `list_installed_skills` | Lists currently installed skills with metadata                            |
-| `check_missing_skills`  | Audits which configured skills are missing                                |
-| `remove_skills`         | Removes specified skills from project                                     |
-
-## Configuration Structure
-
-### skills.config.json
-
-Both global (`~/.ai-skills/skills.config.json`) and project-scoped (`./skills.config.json`) configs use:
-
-```json
-{
-  "skills": [
-    {
-      "name": "code-review",
-      "repository": "https://github.com/user/skills",
-      "skill": "code-review"
-    },
-    {
-      "type": "bundle",
-      "name": "mattpocock-skills",
-      "repository": "https://github.com/mattpocock/skills"
+  "mcpServers": {
+    "skills-manager": {
+      "command": "node",
+      "args": ["C:\\Users\\<username>\\AppData\\Roaming\\npm\\node_modules\\skills-manager-mcp\\dist\\index.js"]
     }
-  ]
+  }
 }
 ```
 
-**Fields:**
+You can also access this file through Claude Desktop: **Settings → Developer → Edit Config**.
 
-- `name` (required): Unique skill identifier
-- `repository` (required): Git HTTPS repository URL
-- `skill` (optional): Folder name in repo; defaults to `name` if omitted
-- `type` (optional): `'skill'` or `'bundle'`; defaults to `'skill'`
+#### macOS
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "skills-manager": {
+      "command": "node",
+      "args": ["/usr/local/lib/node_modules/skills-manager-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+#### Linux
+
+Edit `~/.config/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "skills-manager": {
+      "command": "node",
+      "args": ["/usr/local/lib/node_modules/skills-manager-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+### Verifying Claude Desktop
+
+1. **Restart Claude Desktop** completely (close and reopen)
+2. Go to **Settings → Developer → Edit Config** to verify the file
+3. Look for `skills-manager` in the MCP servers list
+
+---
+
+## Claude Code Configuration
+
+Claude Code (the terminal-based CLI agent) stores user-level MCP configuration in `~/.claude.json`. The `mcpServers` key sits alongside other top-level keys like `preferences` and `coworkUserFilesPath`.
+
+### File Structure
+
+```json
+{
+  "preferences": { ... existing preferences ... },
+  "coworkUserFilesPath": "...",
+  "mcpServers": {
+    "skills-manager": {
+      "command": "node",
+      "args": ["/path/to/skills-manager-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+### Manual Configuration
+
+#### Windows
+
+Edit `%USERPROFILE%\.claude.json`:
+
+```json
+{
+  "preferences": {
+    "launchPreviewPersistedWorkspaces": [],
+    "launchPreviewSessionScopedSessions": [],
+    "coworkHipaaRestricted": false,
+    "coworkWebSearchEnabled": true,
+    "remoteToolsDeviceName": "desktop-xxxxx"
+  },
+  "coworkUserFilesPath": "C:\\Users\\<username>\\Claude",
+  "mcpServers": {
+    "skills-manager": {
+      "command": "node",
+      "args": ["C:\\Users\\<username>\\AppData\\Roaming\\npm\\node_modules\\skills-manager-mcp\\dist\\index.js"]
+    }
+  }
+}
+```
+
+#### macOS
+
+Edit `~/.claude.json`:
+
+```json
+{
+  "preferences": { ... },
+  "coworkUserFilesPath": "/Users/<username>/Library/Application Support/Claude",
+  "mcpServers": {
+    "skills-manager": {
+      "command": "node",
+      "args": ["/usr/local/lib/node_modules/skills-manager-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+#### Linux
+
+Edit `~/.claude.json`:
+
+```json
+{
+  "preferences": { ... },
+  "coworkUserFilesPath": "/home/<username>/.claude",
+  "mcpServers": {
+    "skills-manager": {
+      "command": "node",
+      "args": ["/usr/local/lib/node_modules/skills-manager-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+### Verifying Claude Code
+
+```bash
+# Check registration status
+skills-manager-mcp status
+
+# Run diagnostics
+skills-manager-mcp doctor
+
+# Or use Claude Code's built-in MCP check
+claude mcp list
+```
+
+Inside an active Claude Code session, type `/mcp` to view the connection status.
+
+### Project-Level Configuration
+
+Claude Code also supports project-level MCP servers via `.mcp.json` in your project root. This is useful for team-shared MCP configurations:
+
+```json
+{
+  "mcpServers": {
+    "skills-manager": {
+      "command": "node",
+      "args": ["/path/to/skills-manager-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+---
+
+## Finding Your Node Installation Path
+
+If you need to find the exact path to node or the skills-manager-mcp executable:
+
+### Windows:
+```cmd
+where node
+where skills-manager-mcp
+```
+
+### macOS/Linux:
+```bash
+which node
+which skills-manager-mcp
+```
+
+The skills-manager-mcp executable is typically at:
+- **npm global packages:**
+  - Windows: `%APPDATA%\npm\node_modules\skills-manager-mcp\dist\index.js`
+  - macOS: `/usr/local/lib/node_modules/skills-manager-mcp/dist/index.js`
+  - Linux: `/usr/local/lib/node_modules/skills-manager-mcp/dist/index.js` or `~/.npm/_npx/.../dist/index.js`
 
 ## Troubleshooting
 
-### MCP server not connecting
+### MCP Server Doesn't Appear in Claude Desktop
 
-1. **Verify installation:**
+**Problem:** Setup succeeded but Claude Desktop doesn't show the MCP server.
 
+**Solutions:**
+1. **Restart Claude Desktop** completely (close and reopen)
+2. **Verify the file was written:**
    ```bash
-   skills-manager-mcp status
+   # Windows
+   type %APPDATA%\Claude\claude_desktop_config.json
+
+   # macOS/Linux
+   cat ~/Library/Application\ Support/Claude/claude_desktop_config.json
    ```
+   Look for the `mcpServers` section with `skills-manager` entry
 
-2. **Re-run setup:**
+3. **Check the node path is correct** — the path in `args` must point to an existing file
 
+4. **Run setup again:**
    ```bash
    skills-manager-mcp setup
    ```
 
-3. **Check configuration:**
-   - Ensure `~/.claude.json` exists and contains the `skills-manager` entry
-   - Verify the path to `dist/index.js` is correct
+5. **Check file permissions:**
+   - Ensure the config file is readable by Claude Desktop
+   - The user running Claude Desktop should own the file
 
-4. **Restart Claude** after changes
+### MCP Server Doesn't Appear in Claude Code
 
-### Skills not installing
+**Problem:** Setup succeeded but Claude Code doesn't show the MCP server.
 
-1. Check workspace detection:
+**Solutions:**
+1. **Verify the file was written:**
+   ```bash
+   cat ~/.claude.json
+   ```
+   Look for the `mcpServers` section with `skills-manager` entry
 
+2. **Check via Claude Code CLI:**
+   ```bash
+   claude mcp list
+   ```
+
+3. **Inside a Claude Code session**, type `/mcp` to check status
+
+### Permission Denied Error
+
+If you get permission errors when running setup:
+
+**Windows:**
+```cmd
+icacls %USERPROFILE%\.claude.json /grant:r %USERNAME%:F
+```
+
+**macOS/Linux:**
+```bash
+chmod 644 ~/.claude.json
+```
+
+### JSON Validation Error
+
+If Claude reports invalid JSON:
+
+1. Validate the JSON syntax:
+   ```bash
+   cat ~/.claude.json | python -m json.tool
+   ```
+
+2. Ensure:
+   - All strings are enclosed in double quotes (not single quotes)
+   - No trailing commas after the last item in objects/arrays
+   - Proper nesting of braces and brackets
+
+3. Use a JSON formatter to clean up the file
+
+### MCP Server Connects but Skills Don't Work
+
+1. Verify the workspace has skills configured:
    ```bash
    skills-manager-mcp status
    ```
 
-2. Run diagnostics:
-
+2. Bootstrap your project:
    ```bash
-   skills-manager-mcp doctor
+   skills-manager-mcp bootstrap /path/to/project
    ```
 
-3. Verify `skills.config.json` syntax:
-   - Use valid JSON
-   - Ensure repositories are accessible (HTTPS, public or authenticated)
+3. Check that skills are installed:
+   ```bash
+   ls -la /path/to/project/.agents/skills/
+   ```
 
-## Platform Paths
+## Advanced: Adding Multiple MCP Servers
 
-**macOS:**
+You can add additional MCP servers in the same `mcpServers` section of either config file:
 
-- Config: `~/.claude.json`
-- Cache: `~/.ai-skills/cache/`
+```json
+{
+  "mcpServers": {
+    "skills-manager": {
+      "command": "node",
+      "args": ["/path/to/skills-manager-mcp/dist/index.js"]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/directory"]
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    }
+  }
+}
+```
 
-**Linux:**
+Both Claude Desktop and Claude Code will automatically load all configured MCP servers on startup.
 
-- Config: `~/.claude.json`
-- Cache: `~/.ai-skills/cache/`
+## Integration with Cursor IDE and Codex
 
-**Windows:**
+Cursor IDE and Codex use different configuration formats. See the main [README.md](README.md) for their setup instructions.
 
-- Config: `%USERPROFILE%\.claude.json`
-- Cache: `%USERPROFILE%\.ai-skills\cache\`
+---
 
-## More Information
-
-- [Skills Manager MCP Documentation](README.md)
-- [CLI Commands](README.md#cli-commands)
-- [Configuration Architecture](README.md#configuration)
+**Questions?** Run `skills-manager-mcp doctor` for diagnostics or check the [main README](README.md) for additional help.
