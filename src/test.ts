@@ -26,6 +26,26 @@ import {
   unregisterVsCodeMcp,
   getVsCodeMcpConfigPaths,
 } from "./services/vscodeRegistry.js";
+import {
+  registerClaudeDesktopMcp,
+  unregisterClaudeDesktopMcp,
+  isClaudeDesktopMcpRegistered,
+} from "./services/claudeDesktopRegistry.js";
+import {
+  registerClaudeCodeMcp,
+  unregisterClaudeCodeMcp,
+  isClaudeCodeMcpRegistered,
+} from "./services/claudeCodeRegistry.js";
+import {
+  registerCursorMcp,
+  unregisterCursorMcp,
+  isCursorMcpRegistered,
+} from "./services/cursorRegistry.js";
+import {
+  registerCodexMcp,
+  unregisterCodexMcp,
+  isCodexMcpRegistered,
+} from "./services/codexRegistry.js";
 import { performDoctorChecks } from "./commands/doctor.js";
 import { Tracker } from "./tracker.js";
 import { SkillManager } from "./skillManager.js";
@@ -330,6 +350,149 @@ async function runTests() {
   await fs.rm(mockVsCodeDir, { recursive: true, force: true }).catch(() => {});
   console.log(
     "✓ Test 5F-5I: VS Code registration, preservation, idempotence, and uninstallation passed.",
+  );
+
+  // -------------------------------------------------------------
+  // CLAUDE DESKTOP & CLAUDE CODE REGISTRATION TESTS
+  // -------------------------------------------------------------
+  const mockClaudeDir = await fs.mkdtemp(
+    path.join(os.tmpdir(), "mock-claude-config-"),
+  );
+  const mockClaudeDesktopFile = path.join(
+    mockClaudeDir,
+    "claude_desktop_config.json",
+  );
+  const mockClaudeCodeFile = path.join(mockClaudeDir, ".claude.json");
+
+  // Pre-seed Claude Desktop config with preferences and coworkUserFilesPath
+  const initialClaudeDesktopData = {
+    preferences: {
+      coworkWebSearchEnabled: true,
+      remoteToolsDeviceName: "test-device",
+    },
+    coworkUserFilesPath: "C:\\Users\\Test\\Claude",
+  };
+  await fs.writeFile(
+    mockClaudeDesktopFile,
+    JSON.stringify(initialClaudeDesktopData, null, 2),
+    "utf-8",
+  );
+
+  const mockClaudeServer = path.join(mockClaudeDir, "dist", "index.js");
+  const claudeDesktopReg = await registerClaudeDesktopMcp(
+    mockClaudeServer,
+    mockClaudeDesktopFile,
+  );
+  assert.strictEqual(claudeDesktopReg.registered, true);
+  assert.strictEqual(claudeDesktopReg.newlyAdded, true);
+
+  const desktopReadBack = JSON.parse(
+    await fs.readFile(mockClaudeDesktopFile, "utf-8"),
+  );
+  assert.strictEqual(desktopReadBack.preferences.coworkWebSearchEnabled, true);
+  assert.strictEqual(
+    desktopReadBack.coworkUserFilesPath,
+    "C:\\Users\\Test\\Claude",
+  );
+  assert.ok(desktopReadBack.mcpServers["skills-manager"]);
+  assert.strictEqual(
+    desktopReadBack.mcpServers["skills-manager"].args[0],
+    mockClaudeServer,
+  );
+  assert.strictEqual(
+    await isClaudeDesktopMcpRegistered(mockClaudeDesktopFile),
+    true,
+  );
+
+  // Unregister Claude Desktop
+  await unregisterClaudeDesktopMcp(mockClaudeDesktopFile);
+  const desktopUnregistered = JSON.parse(
+    await fs.readFile(mockClaudeDesktopFile, "utf-8"),
+  );
+  assert.strictEqual(
+    desktopUnregistered.mcpServers["skills-manager"],
+    undefined,
+  );
+  assert.strictEqual(
+    desktopUnregistered.preferences.coworkWebSearchEnabled,
+    true,
+  );
+
+  // Test Claude Code (~/.claude.json)
+  const claudeCodeReg = await registerClaudeCodeMcp(
+    mockClaudeServer,
+    mockClaudeCodeFile,
+  );
+  assert.strictEqual(claudeCodeReg.registered, true);
+  assert.strictEqual(await isClaudeCodeMcpRegistered(mockClaudeCodeFile), true);
+  await unregisterClaudeCodeMcp(mockClaudeCodeFile);
+  assert.strictEqual(
+    await isClaudeCodeMcpRegistered(mockClaudeCodeFile),
+    false,
+  );
+
+  await fs.rm(mockClaudeDir, { recursive: true, force: true }).catch(() => {});
+  console.log(
+    "✓ Test 5J: Claude Desktop & Claude Code registration, preservation, and uninstallation passed.",
+  );
+
+  // -------------------------------------------------------------
+  // CURSOR & CODEX REGISTRATION TESTS
+  // -------------------------------------------------------------
+  const mockCursorDir = await fs.mkdtemp(
+    path.join(os.tmpdir(), "mock-cursor-config-"),
+  );
+  const mockCursorFile = path.join(mockCursorDir, "mcp.json");
+  const mockCursorServer = path.join(mockCursorDir, "dist", "index.js");
+
+  const cursorReg = await registerCursorMcp(
+    mockCursorServer,
+    mockCursorFile,
+  );
+  assert.strictEqual(cursorReg.registered, true);
+  const cursorReadBack = JSON.parse(
+    await fs.readFile(mockCursorFile, "utf-8"),
+  );
+  assert.ok(cursorReadBack.mcpServers["skills-manager"]);
+  assert.strictEqual(
+    cursorReadBack.mcpServers["skills-manager"].args[0],
+    mockCursorServer,
+  );
+  assert.strictEqual(await isCursorMcpRegistered(mockCursorFile), true);
+  await unregisterCursorMcp(mockCursorFile);
+  assert.strictEqual(await isCursorMcpRegistered(mockCursorFile), false);
+  await fs.rm(mockCursorDir, { recursive: true, force: true }).catch(() => {});
+
+  // Codex TOML Test
+  const mockCodexDir = await fs.mkdtemp(
+    path.join(os.tmpdir(), "mock-codex-config-"),
+  );
+  const mockCodexFile = path.join(mockCodexDir, "config.toml");
+  const mockCodexServer = path.join(mockCodexDir, "dist", "index.js");
+
+  // Pre-seed with existing TOML section
+  await fs.writeFile(
+    mockCodexFile,
+    '[model]\ndefault = "gpt-4o"\n\n[mcp_servers.existing]\ncommand = "npx"\nargs = ["some-tool"]\n',
+    "utf-8",
+  );
+
+  const codexReg = await registerCodexMcp(mockCodexServer, mockCodexFile);
+  assert.strictEqual(codexReg.registered, true);
+  const codexContent = await fs.readFile(mockCodexFile, "utf-8");
+  assert.ok(codexContent.includes("[mcp_servers.skills-manager]"));
+  assert.ok(codexContent.includes("[mcp_servers.existing]"));
+  assert.strictEqual(await isCodexMcpRegistered(mockCodexFile), true);
+
+  await unregisterCodexMcp(mockCodexFile);
+  const codexUnregContent = await fs.readFile(mockCodexFile, "utf-8");
+  assert.ok(!codexUnregContent.includes("[mcp_servers.skills-manager]"));
+  assert.ok(codexUnregContent.includes("[mcp_servers.existing]"));
+  assert.strictEqual(await isCodexMcpRegistered(mockCodexFile), false);
+
+  await fs.rm(mockCodexDir, { recursive: true, force: true }).catch(() => {});
+  console.log(
+    "✓ Test 5K: Cursor (mcpServers key) & Codex (TOML format) registration and uninstallation passed.",
   );
 
   // -------------------------------------------------------------

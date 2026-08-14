@@ -32,9 +32,10 @@
 - [Getting Started](#getting-started)
 - [Multi-Editor Integration](#multi-editor-integration)
   - [VS Code](#vs-code-integration)
-  - [Claude](#claude-integration)
+  - [Claude Desktop](#claude-desktop-integration)
+  - [Claude Code](#claude-code-integration)
   - [Cursor IDE](#cursor-ide-integration)
-  - [Codex](#codex-integration)
+  - [Codex CLI](#codex-cli-integration)
   - [Antigravity Desktop](#antigravity-desktop-integration)
 - [CLI Commands](#cli-commands)
 - [Configuration](#configuration)
@@ -141,19 +142,16 @@ The MCP server automatically registers with all VS Code variants during initiali
 **Configuration:** `mcp.json` (automatically updated)
 
 **Supported Variants:**
-
 - VS Code (stable)
 - VS Code Insiders
 - VSCodium
 
 **Paths by Platform:**
-
 - **Windows**: `%APPDATA%\Code\User\mcp.json`
 - **macOS**: `~/Library/Application Support/Code/User/mcp.json`
 - **Linux**: `~/.config/Code/User/mcp.json`
 
 **Configuration Format:**
-
 ```json
 {
   "servers": {
@@ -167,26 +165,24 @@ The MCP server automatically registers with all VS Code variants during initiali
 ```
 
 **Usage in VS Code:**
-
 1. Open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
 2. Search "MCP: List Servers"
 3. Select and start `skills-manager`
 4. Use skills in Copilot Chat agent mode
 
-### Claude Integration
+### Claude Desktop Integration
 
-The MCP server automatically registers with Claude's primary configuration file.
+Claude Desktop (the GUI application) uses `claude_desktop_config.json` with the `mcpServers` top-level key.
 
-**Configuration:** `~/.claude.json` (recommended by Claude)
+**Configuration:** `claude_desktop_config.json` (automatically updated)
 
-**Alternative Locations (priority order):**
-
-- `~/.claude/mcp_servers.json` — Dedicated MCP file
-- `~/.claude/settings.json` — User-specific settings
-- `.mcp.json` — Project-scoped (version-controlled, requires enablement)
+**Paths by Platform:**
+- **Windows (Standard)**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Windows (Store / MSIX)**: `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\claude_desktop_config.json`
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
 **Configuration Format:**
-
 ```json
 {
   "mcpServers": {
@@ -198,48 +194,80 @@ The MCP server automatically registers with Claude's primary configuration file.
 }
 ```
 
+### Claude Code Integration
+
+Claude Code (the terminal-based CLI agent) uses `~/.claude.json` for user-level tools and `.mcp.json` for project-scoped tools.
+
+**Configuration:** `~/.claude.json` (automatically updated)
+
 **Paths by Platform:**
-
 - **All Platforms**: `~/.claude.json`
-- **Windows Alternative**: `%USERPROFILE%\.claude.json`
+- **Windows**: `%USERPROFILE%\.claude.json`
+- **Project-level**: `.mcp.json` (in project root)
 
-For detailed setup instructions, see [CLAUDE_SETUP.md](CLAUDE_SETUP.md).
+**Configuration Format:**
+```json
+{
+  "preferences": { ... },
+  "mcpServers": {
+    "skills-manager": {
+      "command": "node",
+      "args": ["/path/to/skills-manager-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+For detailed Claude setup instructions, see [CLAUDE_SETUP.md](CLAUDE_SETUP.md).
 
 ### Cursor IDE Integration
 
-Cursor IDE uses the same configuration format as VS Code.
+Cursor IDE uses `mcp.json` with the `mcpServers` top-level key.
 
-**Configuration:** `mcp.json` (automatically updated)
-
-**Paths by Platform:**
-
-- **Windows**: `%APPDATA%\Cursor\User\mcp.json`
-- **macOS**: `~/Library/Application Support/Cursor/User/mcp.json`
-- **Linux**: `~/.config/Cursor/User/mcp.json`
-
-### Codex Integration
-
-Codex uses the same configuration format as VS Code.
-
-**Configuration:** `mcp.json` (automatically updated)
+**Configuration:** `~/.cursor/mcp.json` (automatically updated)
 
 **Paths by Platform:**
+- **Global / User**: `~/.cursor/mcp.json` (all platforms)
+- **Project-level**: `.cursor/mcp.json` (in project root)
 
-- **Windows**: `%APPDATA%\Codex\User\mcp.json`
-- **macOS**: `~/Library/Application Support/Codex/User/mcp.json`
-- **Linux**: `~/.config/Codex/User/mcp.json`
+**Configuration Format:**
+```json
+{
+  "mcpServers": {
+    "skills-manager": {
+      "command": "node",
+      "args": ["/path/to/skills-manager-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+### Codex CLI Integration
+
+OpenAI Codex CLI uses `config.toml` in TOML format with `[mcp_servers.<name>]` tables.
+
+**Configuration:** `~/.codex/config.toml` (automatically updated)
+
+**Paths by Platform:**
+- **Global / User**: `~/.codex/config.toml` (all platforms)
+- **Project-level**: `.codex/config.toml` (in project root)
+
+**Configuration Format (TOML):**
+```toml
+[mcp_servers.skills-manager]
+command = "node"
+args = ["/path/to/skills-manager-mcp/dist/index.js"]
+```
 
 ### Antigravity Desktop Integration
 
 Antigravity Desktop is the primary MCP target with specialized registration.
 
 **Configuration Files:**
-
 - `~/.gemini/config/mcp_config.json` — Primary
 - `~/.gemini/antigravity-ide/mcp.json` — Secondary
 
 **Configuration Format:**
-
 ```json
 {
   "mcpServers": {

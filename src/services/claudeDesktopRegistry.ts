@@ -4,55 +4,123 @@ import fs from "node:fs/promises";
 import { getMcpServerIndexPath } from "./antigravityRegistry.js";
 
 /**
- * Resolves the path to Claude Desktop's MCP configuration file.
+ * Resolves all candidate paths to Claude Desktop's MCP configuration file.
  *
  * Claude Desktop (the GUI application) stores MCP server definitions in
- * `claude_desktop_config.json` within the OS-specific application support folder:
- *   - Windows: %APPDATA%\Claude\claude_desktop_config.json
- *   - macOS:   ~/Library/Application Support/Claude/claude_desktop_config.json
- *   - Linux:   ~/.config/Claude/claude_desktop_config.json
+ * `claude_desktop_config.json`.
  *
- * This is SEPARATE from Claude Code (the terminal CLI), which uses `~/.claude.json`.
+ * On Windows, Claude Desktop can be installed via:
+ *   1. Standard installer:
+ *      %APPDATA%\Claude\claude_desktop_config.json
+ *   2. Windows Store / MSIX Packaged App:
+ *      %LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\claude_desktop_config.json
  *
- * The file uses a `mcpServers` key at the top level to define MCP servers.
+ * On macOS:
+ *   ~/Library/Application Support/Claude/claude_desktop_config.json
+ *
+ * On Linux:
+ *   ~/.config/Claude/claude_desktop_config.json
  *
  * @see https://modelcontextprotocol.io/quickstart/user
  */
-export function getClaudeDesktopMcpConfigPath(): string {
+export async function getClaudeDesktopMcpConfigPaths(): Promise<string[]> {
   const home = os.homedir();
   const platform = os.platform();
 
   if (platform === "win32") {
+    const paths: string[] = [];
     const appData =
       process.env.APPDATA || path.join(home, "AppData", "Roaming");
-    return path.join(appData, "Claude", "claude_desktop_config.json");
+    const standardPath = path.join(appData, "Claude", "claude_desktop_config.json");
+
+    // Check Windows Store / MSIX packaged Claude (e.g. Claude_pzs8sxrjxfjjc)
+    const localAppData =
+      process.env.LOCALAPPDATA || path.join(home, "AppData", "Local");
+    const packagesDir = path.join(localAppData, "Packages");
+
+    try {
+      const entries = await fs.readdir(packagesDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (
+          entry.isDirectory() &&
+          entry.name.toLowerCase().startsWith("claude_")
+        ) {
+          const packagedClaudePath = path.join(
+            packagesDir,
+            entry.name,
+            "LocalCache",
+            "Roaming",
+            "Claude",
+            "claude_desktop_config.json",
+          );
+          paths.push(packagedClaudePath);
+        }
+      }
+    } catch {
+      // Ignore if Packages directory is missing or unreadable
+    }
+
+    paths.push(standardPath);
+    return paths;
   }
 
   if (platform === "darwin") {
-    return path.join(
-      home,
-      "Library",
-      "Application Support",
-      "Claude",
-      "claude_desktop_config.json",
-    );
+    return [
+      path.join(
+        home,
+        "Library",
+        "Application Support",
+        "Claude",
+        "claude_desktop_config.json",
+      ),
+    ];
   }
 
   // Linux / other Unix
   const configHome = process.env.XDG_CONFIG_HOME || path.join(home, ".config");
-  return path.join(configHome, "Claude", "claude_desktop_config.json");
+  return [path.join(configHome, "Claude", "claude_desktop_config.json")];
+}
+
+/**
+ * Returns primary Claude Desktop configuration path for display.
+ * Returns the first path where a config or parent directory exists, or standard default.
+ */
+export async function getClaudeDesktopMcpConfigPath(): Promise<string> {
+  const candidatePaths = await getClaudeDesktopMcpConfigPaths();
+
+  for (const candidate of candidatePaths) {
+    try {
+      const exists = await fs
+        .stat(candidate)
+        .then((s) => s.isFile())
+        .catch(() => false);
+      if (exists) return candidate;
+
+      const parentExists = await fs
+        .stat(path.dirname(candidate))
+        .then((s) => s.isDirectory())
+        .catch(() => false);
+      if (parentExists) return candidate;
+    } catch {
+      // Continue to next candidate
+    }
+  }
+
+  return candidatePaths[0];
 }
 
 export interface ClaudeDesktopRegistrationResult {
   registered: boolean;
   configPath: string;
+  configPaths: string[];
   serverIndexPath: string;
   newlyAdded: boolean;
 }
 
 /**
  * Helper to register skills-manager into Claude Desktop's configuration file.
- * Claude Desktop uses `mcpServers` key at the top level.
+ * Claude Desktop uses `mcpServers` key at the top level, preserving all existing
+ * keys (like preferences, coworkUserFilesPath, etc.).
  *
  * @returns True if the entry was newly added or updated, false if already current.
  */
@@ -101,8 +169,8 @@ async function registerIntoClaudeDesktopFile(
 }
 
 /**
- * Registers skills-manager-mcp into Claude Desktop's MCP configuration file.
- * Uses the OS-specific `claude_desktop_config.json` location.
+ * Registers skills-manager-mcp into Claude Desktop's MCP configuration file(s).
+ * Automatically detects standard and Windows Store packaged installations.
  * Preserves all existing MCP server configurations and operates idempotently.
  *
  * @param customServerPath Optional custom path to dist/index.js
@@ -112,71 +180,123 @@ export async function registerClaudeDesktopMcp(
   customServerPath?: string,
   customConfigPath?: string,
 ): Promise<ClaudeDesktopRegistrationResult> {
-  const targetPath = customConfigPath || getClaudeDesktopMcpConfigPath();
+  const targetPaths = customConfigPath
+    ? [customConfigPath]
+    : await getClaudeDesktopMcpConfigPaths();
   const serverIndexPath = customServerPath || getMcpServerIndexPath();
 
-  try {
-    const newlyAdded = await registerIntoClaudeDesktopFile(
-      targetPath,
-      serverIndexPath,
-    );
-    return {
-      registered: true,
-      configPath: targetPath,
-      serverIndexPath,
-      newlyAdded,
-    };
-  } catch {
-    // If registration fails (e.g., Claude Desktop not installed), return a non-critical result
-    return {
-      registered: false,
-      configPath: targetPath,
-      serverIndexPath,
-      newlyAdded: false,
-    };
+  let newlyAdded = false;
+  let registeredAtLeastOne = false;
+  const successfulPaths: string[] = [];
+
+  // Register in existing Claude directories first, or all if none exist
+  for (const targetPath of targetPaths) {
+    try {
+      const parentDir = path.dirname(targetPath);
+      const parentExists = await fs
+        .stat(parentDir)
+        .then((s) => s.isDirectory())
+        .catch(() => false);
+      const fileExists = await fs
+        .stat(targetPath)
+        .then((s) => s.isFile())
+        .catch(() => false);
+
+      // If the directory or file exists, or if this is the only target path
+      if (parentExists || fileExists || targetPaths.length === 1) {
+        const added = await registerIntoClaudeDesktopFile(
+          targetPath,
+          serverIndexPath,
+        );
+        if (added) newlyAdded = true;
+        registeredAtLeastOne = true;
+        successfulPaths.push(targetPath);
+      }
+    } catch {
+      // Ignore individual file write failures
+    }
   }
+
+  // If no specific existing path was found, register to the default path
+  if (!registeredAtLeastOne && targetPaths.length > 0) {
+    const defaultPath = targetPaths[targetPaths.length - 1];
+    try {
+      const added = await registerIntoClaudeDesktopFile(
+        defaultPath,
+        serverIndexPath,
+      );
+      if (added) newlyAdded = true;
+      registeredAtLeastOne = true;
+      successfulPaths.push(defaultPath);
+    } catch {
+      // Ignore
+    }
+  }
+
+  return {
+    registered: registeredAtLeastOne,
+    configPath: successfulPaths[0] || targetPaths[0],
+    configPaths: successfulPaths.length > 0 ? successfulPaths : targetPaths,
+    serverIndexPath,
+    newlyAdded,
+  };
 }
 
 /**
  * Removes the skills-manager MCP server entry from Claude Desktop's configuration.
- * Preserves all other user MCP servers.
+ * Preserves all other user MCP servers and preferences.
  *
  * @param customConfigPath Optional custom path to a config file (for testing)
  */
 export async function unregisterClaudeDesktopMcp(
   customConfigPath?: string,
-): Promise<{ unregistered: boolean; configPath: string }> {
-  const targetPath = customConfigPath || getClaudeDesktopMcpConfigPath();
+): Promise<{ unregistered: boolean; configPaths: string[] }> {
+  const targetPaths = customConfigPath
+    ? [customConfigPath]
+    : await getClaudeDesktopMcpConfigPaths();
 
-  try {
-    const existingContent = await fs.readFile(targetPath, "utf-8");
-    const parsed = JSON.parse(existingContent);
+  for (const targetPath of targetPaths) {
+    try {
+      const existingContent = await fs.readFile(targetPath, "utf-8");
+      const parsed = JSON.parse(existingContent);
 
-    if (parsed && parsed.mcpServers && parsed.mcpServers["skills-manager"]) {
-      delete parsed.mcpServers["skills-manager"];
-      await fs.writeFile(targetPath, JSON.stringify(parsed, null, 2), "utf-8");
+      if (parsed && parsed.mcpServers && parsed.mcpServers["skills-manager"]) {
+        delete parsed.mcpServers["skills-manager"];
+        await fs.writeFile(
+          targetPath,
+          JSON.stringify(parsed, null, 2),
+          "utf-8",
+        );
+      }
+    } catch {
+      // Ignore if file doesn't exist
     }
-  } catch {
-    // Ignore if file doesn't exist
   }
 
-  return { unregistered: true, configPath: targetPath };
+  return { unregistered: true, configPaths: targetPaths };
 }
 
 /**
- * Checks whether skills-manager is registered in Claude Desktop's configuration.
+ * Checks whether skills-manager is registered in any Claude Desktop configuration.
  */
 export async function isClaudeDesktopMcpRegistered(
   customConfigPath?: string,
 ): Promise<boolean> {
-  const configPath = customConfigPath || getClaudeDesktopMcpConfigPath();
+  const targetPaths = customConfigPath
+    ? [customConfigPath]
+    : await getClaudeDesktopMcpConfigPaths();
 
-  try {
-    const content = await fs.readFile(configPath, "utf-8");
-    const parsed = JSON.parse(content);
-    return !!parsed?.mcpServers?.["skills-manager"];
-  } catch {
-    // File missing or invalid
-    return false;
+  for (const configPath of targetPaths) {
+    try {
+      const content = await fs.readFile(configPath, "utf-8");
+      const parsed = JSON.parse(content);
+      if (parsed?.mcpServers?.["skills-manager"]) {
+        return true;
+      }
+    } catch {
+      // File missing or invalid; continue checking
+    }
   }
+
+  return false;
 }

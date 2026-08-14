@@ -127,7 +127,7 @@ export async function performDoctorChecks(): Promise<DoctorCheckResult[]> {
   });
 
   // Check 3d: Claude Desktop MCP registration
-  const claudeDesktopConfigPath = getClaudeDesktopMcpConfigPath();
+  const claudeDesktopConfigPath = await getClaudeDesktopMcpConfigPath();
   const claudeDesktopRegistered = await isClaudeDesktopMcpRegistered();
   results.push({
     title: "Claude Desktop MCP registered",

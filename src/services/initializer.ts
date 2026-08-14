@@ -133,66 +133,39 @@ export async function ensureInitialized(
     console.log(`✓ Server executable path: ${regResult.serverIndexPath}`);
   }
 
-  // 4. Automatically register MCP server in VS Code user mcp.json
-  const vsCodeRegResult = await registerVsCodeMcp(
-    options.customServerPath,
-    options.customConfigPath,
-  );
+  if (!options.customConfigPath) {
+    // 4. Automatically register MCP server in VS Code user mcp.json
+    const vsCodeRegResult = await registerVsCodeMcp(options.customServerPath);
+    if (!options.silent) {
+      console.log(`✓ VS Code MCP registered: ${vsCodeRegResult.configPaths[0]}`);
+    }
 
-  if (!options.silent) {
-    console.log(`✓ VS Code MCP registered: ${vsCodeRegResult.configPaths[0]}`);
-  }
-
-  // 5. Automatically register MCP server in Cursor user mcp.json
-  const cursorRegResult = await registerCursorMcp(
-    options.customServerPath,
-    options.customConfigPath,
-  );
-
-  if (!options.silent) {
-    if (cursorRegResult.registered) {
+    // 5. Automatically register MCP server in Cursor user mcp.json
+    const cursorRegResult = await registerCursorMcp(options.customServerPath);
+    if (!options.silent && cursorRegResult.registered) {
       console.log(`✓ Cursor IDE MCP registered: ${cursorRegResult.configPath}`);
     }
-  }
 
-  // 6. Automatically register MCP server in Claude Desktop (claude_desktop_config.json)
-  const claudeDesktopRegResult = await registerClaudeDesktopMcp(
-    options.customServerPath,
-    options.customConfigPath,
-  );
-
-  if (!options.silent) {
-    if (claudeDesktopRegResult.registered) {
-      console.log(
-        `✓ Claude Desktop MCP registered: ${claudeDesktopRegResult.configPath}`,
-      );
+    // 6. Automatically register MCP server in Claude Desktop (claude_desktop_config.json)
+    const claudeDesktopRegResult = await registerClaudeDesktopMcp(options.customServerPath);
+    if (!options.silent && claudeDesktopRegResult.registered) {
+      console.log(`✓ Claude Desktop MCP registered: ${claudeDesktopRegResult.configPath}`);
     }
-  }
 
-  // 7. Automatically register MCP server in Claude Code user (~/.claude.json)
-  const claudeCodeRegResult = await registerClaudeCodeMcp(
-    options.customServerPath,
-    options.customConfigPath,
-  );
-
-  if (!options.silent) {
-    if (claudeCodeRegResult.registered) {
-      console.log(
-        `✓ Claude Code MCP registered: ${claudeCodeRegResult.configPath}`,
-      );
+    // 7. Automatically register MCP server in Claude Code user (~/.claude.json)
+    const claudeCodeRegResult = await registerClaudeCodeMcp(options.customServerPath);
+    if (!options.silent && claudeCodeRegResult.registered) {
+      console.log(`✓ Claude Code MCP registered: ${claudeCodeRegResult.configPath}`);
     }
-  }
 
-  // 8. Automatically register MCP server in Codex CLI (~/.codex/config.toml)
-  const codexRegResult = await registerCodexMcp(
-    options.customServerPath,
-    options.customConfigPath,
-  );
-
-  if (!options.silent) {
-    if (codexRegResult.registered) {
+    // 8. Automatically register MCP server in Codex CLI (~/.codex/config.toml)
+    const codexRegResult = await registerCodexMcp(options.customServerPath);
+    if (!options.silent && codexRegResult.registered) {
       console.log(`✓ Codex MCP registered: ${codexRegResult.configPath}`);
     }
+  }
+
+  if (!options.silent) {
     console.log("\nInitialization complete.\n");
   }
 
