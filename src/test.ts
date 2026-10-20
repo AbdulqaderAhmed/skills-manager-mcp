@@ -929,6 +929,9 @@ async function runTests() {
   const sparseDest = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "test-sparse-dst-")), "clone");
   await fs.mkdir(path.join(sparseSrc, "skills", "alpha", "agents"), { recursive: true });
   await fs.mkdir(path.join(sparseSrc, "skills", "beta"), { recursive: true });
+  await fs.mkdir(path.join(sparseSrc, "skills", "gamma[1]"), { recursive: true });
+  await fs.writeFile(path.join(sparseSrc, "skills", "gamma[1]", "SKILL.md"), "---\nname: gamma\n---\n");
+  await fs.writeFile(path.join(sparseSrc, "skills", "gamma[1]", "keep.txt"), "x");
   await fs.mkdir(path.join(sparseSrc, "huge"), { recursive: true });
   await fs.writeFile(path.join(sparseSrc, "skills", "alpha", "SKILL.md"), "---\nname: alpha\n---\n");
   await fs.writeFile(path.join(sparseSrc, "skills", "alpha", "agents", "x.yaml"), "a: 1");
@@ -939,7 +942,8 @@ async function runTests() {
   execFileSync("git", [...gitEnv, "commit", "-q", "-m", "init"], { cwd: sparseSrc });
 
   const sparseDirs = await gitCloneSkillFolders({ cloneUrl: sparseSrc }, sparseDest);
-  assert.deepStrictEqual(sparseDirs.sort(), ["skills/alpha", "skills/beta"]);
+  assert.deepStrictEqual(sparseDirs.sort(), ["skills/alpha", "skills/beta", "skills/gamma[1]"]);
+  assert.ok(await fs.stat(path.join(sparseDest, "skills", "gamma[1]", "keep.txt")).then(() => true, () => false), "Glob characters in folder names must be escaped");
   assert.ok(await fs.stat(path.join(sparseDest, "skills", "alpha", "agents", "x.yaml")).then(() => true, () => false));
   assert.strictEqual(
     await fs.stat(path.join(sparseDest, "huge")).then(() => true, () => false),

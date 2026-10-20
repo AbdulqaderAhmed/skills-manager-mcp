@@ -64,7 +64,7 @@ export function parseRepositorySource(url: string): RepositorySource {
  * Escapes a folder path for use as a gitignore-style sparse-checkout pattern.
  */
 function toSparsePattern(dir: string): string {
-  return `/${dir.replace(/([\*?[\]])/g, '\$1')}/`;
+  return `/${dir.replace(/([\\*?[\]])/g, '\\$1')}/`;
 }
 
 /**
@@ -73,6 +73,26 @@ function toSparsePattern(dir: string): string {
  * tree, and checks out just the skill folders. No shell is involved.
  */
 export async function gitCloneSkillFolders(
+  source: RepositorySource,
+  destDir: string,
+  attempts = 5
+): Promise<string[]> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await cloneSkillFoldersOnce(source, destDir);
+    } catch (err: any) {
+      lastError = err;
+      // Missing skills are permanent; only retry git/network failures
+      if (/^No SKILL\.md found/.test(err?.message || '') || attempt === attempts) break;
+      await fs.rm(destDir, { recursive: true, force: true }).catch(() => {});
+      await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
+    }
+  }
+  throw lastError;
+}
+
+async function cloneSkillFoldersOnce(
   source: RepositorySource,
   destDir: string
 ): Promise<string[]> {
