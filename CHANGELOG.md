@@ -5,6 +5,14 @@ All notable changes to the `skills-manager-mcp` project will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.1] - 2026-10-20
+
+### Fixed
+- Large monorepos (e.g. remotion-dev/remotion, 1.3 GB) no longer time out: only folders containing `SKILL.md` are fetched via a partial, sparse clone.
+- GitHub `/tree/<ref>/<path>` repository URLs are now parsed into a cloneable URL, branch/tag and sub-folder.
+
+---
+
 ## [1.13.0] - 2026-10-20
 
 ### Added
