@@ -107,17 +107,17 @@ export async function listInstalledSkillFolders(projectPath: string): Promise<st
  */
 export async function removeSkillFolder(
   projectPath: string,
-  skillName: string
+  skillName: string,
+  baseDir: '.agents' | '.claude' = '.agents'
 ): Promise<boolean> {
-  const skillsDir = path.resolve(projectPath, '.agents', 'skills');
-  const target = path.resolve(skillsDir, skillName);
-  // Refuse anything that is not strictly inside .agents/skills (e.g. '..', '.', absolute paths)
-  if (!target.startsWith(skillsDir + path.sep)) {
+  const skillsDir = path.resolve(projectPath, baseDir, 'skills');
+  const skillPath = path.resolve(skillsDir, skillName);
+  // Refuse anything that is not strictly inside the skills dir (e.g. '..', '.', absolute paths)
+  if (!skillPath.startsWith(skillsDir + path.sep)) {
     throw new Error(`Refusing to remove '${skillName}': path escapes the skills directory.`);
   }
 
-  const { exists, skillPath } = await checkSkillExists(projectPath, skillName);
-  if (!exists) {
+  if (!(await isDirectory(skillPath))) {
     return false;
   }
   await fs.rm(skillPath, { recursive: true, force: true });

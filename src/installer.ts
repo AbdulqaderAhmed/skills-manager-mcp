@@ -7,6 +7,7 @@ import { SkillConfig, InstallResult, SkillType } from './types.js';
 import { checkSkillExists, ensureSkillsDirectory, isDirectory } from './filesystem.js';
 import { CacheManager } from './cacheManager.js';
 import { Tracker } from './tracker.js';
+import { mirrorSkillsToClaude } from './claudeSkills.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -238,6 +239,34 @@ async function downloadAndExtractBundle(
  * @returns Installation result with detailed step-by-step logs
  */
 export async function installSkill(
+  projectPath: string,
+  skillConfig: SkillConfig
+): Promise<InstallResult> {
+  const result = await installSkillToAgents(projectPath, skillConfig);
+  if (result.status === 'failed') return result;
+
+  // Claude Code only loads skills from .claude/skills, so mirror what was installed (or already present)
+  const names = result.discoveredSkills ?? [skillConfig.name];
+  try {
+    const mirror = await mirrorSkillsToClaude(projectPath, names);
+    const lines: string[] = [];
+    if (mirror.mirrored.length > 0) {
+      lines.push(
+        `[Claude Code] Mirrored ${mirror.mirrored.length} skill(s) to '.claude/skills/': ${mirror.mirrored.join(', ')}.`
+      );
+    }
+    if (mirror.mirrored.length === 0 && mirror.alreadyPresent.length > 0) {
+      lines.push(`[Claude Code] Already available in '.claude/skills/'.`);
+    }
+    for (const w of mirror.warnings) lines.push(`[Claude Code Warning] ${w}`);
+    if (lines.length > 0) result.message += '\n' + lines.join('\n');
+  } catch (err: any) {
+    result.message += `\n[Claude Code Warning] Could not mirror to '.claude/skills/': ${err?.message || err}`;
+  }
+  return result;
+}
+
+async function installSkillToAgents(
   projectPath: string,
   skillConfig: SkillConfig
 ): Promise<InstallResult> {

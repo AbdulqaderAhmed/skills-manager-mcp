@@ -5,6 +5,18 @@ All notable changes to the `skills-manager-mcp` project will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Claude Code skill support**: installed skills are mirrored into `.claude/skills/<name>/` (the only project location Claude Code loads). Existing folders are never overwritten; `remove_skills` removes both copies; `list_installed_skills` reports Claude Code availability.
+
+### Fixed
+- `remove_skills` path traversal (names like `..` could delete outside `.agents/skills`).
+- Shell command injection through repository URLs in `git clone` (now `execFile`).
+- MCP server reported a hard-coded version; it now reads `package.json`.
+
+---
+
 ## [1.6.0] - 2026-07-23
 
 ### Added

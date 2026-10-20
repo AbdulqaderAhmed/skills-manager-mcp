@@ -10,6 +10,7 @@ import {
 } from './filesystem.js';
 import { installSkill, isValidSkillName } from './installer.js';
 import { Tracker } from './tracker.js';
+import { listClaudeSkills } from './claudeSkills.js';
 import { CacheManager } from './cacheManager.js';
 import {
   InstallSkillsReport,
@@ -256,6 +257,8 @@ export class SkillManager {
     const installedFolders = await listInstalledSkillFolders(targetDir);
     const tracker = await Tracker.loadTracker(targetDir);
 
+    const claudeSkills = new Set(await listClaudeSkills(targetDir));
+
     const skills = installedFolders.map((folder) => {
       const fullPath = path.join(targetDir, '.agents', 'skills', folder);
       const metadata = tracker.skills[folder];
@@ -288,10 +291,16 @@ export class SkillManager {
           s.installedSkills && s.installedSkills.length > 0
             ? ` (Includes: ${s.installedSkills.join(', ')})`
             : '';
+        const claudeStr =
+          s.type === 'bundle' ? '' : claudeSkills.has(s.name) ? ' [Claude Code: ✓]' : ' [Claude Code: ✗ not in .claude/skills]';
         summaryLines.push(
-          `- ${s.name}${typeStr} [Location: ${s.location}]${sourceStr}${bundleSkillsStr} (${s.status})`
+          `- ${s.name}${typeStr} [Location: ${s.location}]${sourceStr}${bundleSkillsStr}${claudeStr} (${s.status})`
         );
       });
+      summaryLines.push('');
+      summaryLines.push(
+        `Claude Code loads skills from ${path.join(targetDir, '.claude', 'skills')} (${claudeSkills.size} available). Run sync_skills to mirror missing ones.`
+      );
     }
 
     return {
@@ -417,12 +426,14 @@ export class SkillManager {
           const subSkills = (trackedMetadata.installedSkills || []).filter(isValidSkillName);
           for (const subSkill of subSkills) {
             await removeSkillFolder(targetDir, subSkill);
+            await removeSkillFolder(targetDir, subSkill, '.claude');
           }
           await Tracker.removeSkillFromTracker(targetDir, name);
           wasRemoved = true;
         } else {
           // Individual skill removal (or single skill folder deletion)
           const folderRemoved = await removeSkillFolder(targetDir, name);
+          await removeSkillFolder(targetDir, name, '.claude');
           await Tracker.removeSkillFromTracker(targetDir, name);
           if (folderRemoved || trackedMetadata) {
             wasRemoved = true;

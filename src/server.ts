@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
@@ -7,6 +8,8 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { SkillManager } from './skillManager.js';
 
+const pkgVersion: string = createRequire(import.meta.url)('../package.json').version;
+
 /**
  * Creates and configures the Skills Manager MCP Server instance.
  */
@@ -14,7 +17,7 @@ export function createServer(): Server {
   const server = new Server(
     {
       name: 'skills-manager-mcp',
-      version: '1.6.0',
+      version: pkgVersion,
     },
     {
       capabilities: {
@@ -46,7 +49,7 @@ export function createServer(): Server {
         {
           name: 'bootstrap_project',
           description:
-            'Automatically bootstrap a new or existing project workspace by setting up .agents/skills, loading personal skill collection & project config, using global cache, installing missing skills, and updating version metadata tracker (.agents/skills-manager.json).',
+            'Automatically bootstrap a new or existing project workspace by setting up .agents/skills (mirrored into .claude/skills for Claude Code), loading personal skill collection & project config, using global cache, installing missing skills, and updating version metadata tracker (.agents/skills-manager.json).',
           inputSchema: {
             type: 'object',
             properties: {
@@ -88,7 +91,7 @@ export function createServer(): Server {
         {
           name: 'install_skills',
           description:
-            'Install missing project skills defined in project/global skills.config.json into .agents/skills. Uses workspace auto-detection, global cache, and version tracking.',
+            'Install missing project skills defined in project/global skills.config.json into .agents/skills and mirrors them into .claude/skills so Claude Code can load them. Uses workspace auto-detection, global cache, and version tracking.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -109,7 +112,7 @@ export function createServer(): Server {
         {
           name: 'list_installed_skills',
           description:
-            'List all currently installed skills inside the project (.agents/skills) along with version metadata tracker details.',
+            'List all currently installed skills inside the project (.agents/skills) and whether each is available to Claude Code (.claude/skills), along with version metadata tracker details.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -146,7 +149,7 @@ export function createServer(): Server {
         {
           name: 'remove_skills',
           description:
-            'Remove one or an array of specified skills or bundles from the project workspace (.agents/skills) and update metadata tracking.',
+            'Remove one or an array of specified skills or bundles from the project workspace (.agents/skills and .claude/skills) and update metadata tracking.',
           inputSchema: {
             type: 'object',
             properties: {

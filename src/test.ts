@@ -10,6 +10,11 @@ import {
   installSkill,
 } from "./installer.js";
 import { loadSkillsConfig } from "./config.js";
+import {
+  parseSkillFrontmatter,
+  mirrorSkillsToClaude,
+  listClaudeSkills,
+} from "./claudeSkills.js";
 import { CacheManager } from "./cacheManager.js";
 import {
   detectWorkspace,
@@ -854,6 +859,55 @@ async function runTests() {
   assert.ok(badIdentifierResult.message.includes("Invalid skill identifier"));
   await fs.rm(injectionDir, { recursive: true, force: true }).catch(() => {});
   console.log("✓ Test 10B: git clone command injection protection passed.");
+
+  // Test 11: Claude Code skill support (.claude/skills mirroring, frontmatter, removal)
+  const fm = parseSkillFrontmatter(
+    "---\nname: demo-skill\ndescription: >\n  Folded text\n  continues here\nargument-hint: x\n---\n# Body",
+  );
+  assert.strictEqual(fm?.name, "demo-skill");
+  assert.strictEqual(fm?.description, "Folded text continues here");
+  assert.strictEqual(parseSkillFrontmatter("# no frontmatter"), null);
+
+  const ccProject = await fs.mkdtemp(path.join(os.tmpdir(), "test-claude-skills-"));
+  const ccAgents = path.join(ccProject, ".agents", "skills");
+  await fs.mkdir(path.join(ccAgents, "good-skill", "agents"), { recursive: true });
+  await fs.writeFile(
+    path.join(ccAgents, "good-skill", "SKILL.md"),
+    "---\nname: good-skill\ndescription: Does a thing\n---\nBody",
+  );
+  await fs.writeFile(path.join(ccAgents, "good-skill", "agents", "x.yaml"), "a: 1");
+  await fs.mkdir(path.join(ccAgents, "no-desc"), { recursive: true });
+  await fs.writeFile(path.join(ccAgents, "no-desc", "SKILL.md"), "---\nname: no-desc\n---\nBody");
+  await fs.mkdir(path.join(ccAgents, "category", "nested"), { recursive: true });
+  await fs.writeFile(path.join(ccAgents, "category", "nested", "SKILL.md"), "---\nname: nested\n---\n");
+  // A hand-written Claude skill must never be overwritten
+  await fs.mkdir(path.join(ccProject, ".claude", "skills", "good-skill"), { recursive: true });
+  await fs.writeFile(path.join(ccProject, ".claude", "skills", "good-skill", "SKILL.md"), "USER VERSION");
+
+  const mirror1 = await mirrorSkillsToClaude(ccProject, ["good-skill", "no-desc", "category", "../evil"]);
+  assert.deepStrictEqual(mirror1.alreadyPresent, ["good-skill"]);
+  assert.deepStrictEqual(mirror1.mirrored, ["no-desc"]);
+  assert.deepStrictEqual(mirror1.skipped.sort(), ["../evil", "category"]);
+  assert.ok(mirror1.warnings.some((w) => w.includes("no-desc") && w.includes("description")));
+  assert.strictEqual(
+    await fs.readFile(path.join(ccProject, ".claude", "skills", "good-skill", "SKILL.md"), "utf-8"),
+    "USER VERSION",
+  );
+
+  await fs.rm(path.join(ccProject, ".claude"), { recursive: true });
+  const mirror2 = await mirrorSkillsToClaude(ccProject, ["good-skill"]);
+  assert.deepStrictEqual(mirror2.mirrored, ["good-skill"]);
+  assert.ok(
+    await fs.stat(path.join(ccProject, ".claude", "skills", "good-skill", "agents", "x.yaml")).then(() => true, () => false),
+    "Skill subfolders must be copied too",
+  );
+  assert.deepStrictEqual(await listClaudeSkills(ccProject), ["good-skill"]);
+
+  const ccRemove = await SkillManager.removeSkills(["good-skill"], false, ccProject);
+  assert.deepStrictEqual(ccRemove.removed, ["good-skill"]);
+  assert.deepStrictEqual(await listClaudeSkills(ccProject), []);
+  await fs.rm(ccProject, { recursive: true, force: true }).catch(() => {});
+  console.log("✓ Test 11: Claude Code .claude/skills mirroring passed.");
 
   // Restore env vars & cleanup temp dirs
   if (origEnvMcpWorkspace) process.env.MCP_WORKSPACE_DIR = origEnvMcpWorkspace;

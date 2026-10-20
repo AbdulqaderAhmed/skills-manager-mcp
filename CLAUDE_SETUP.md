@@ -222,6 +222,20 @@ claude mcp list
 
 Inside an active Claude Code session, type `/mcp` to view the connection status.
 
+### Where Claude Code Loads Skills From
+
+Claude Code (CLI and the desktop Code tab) loads project skills only from `<project>/.claude/skills/<skill-name>/SKILL.md` (and personal skills from `~/.claude/skills/`). It does not read `.agents/skills`, and skills grouped in category folders are not discovered.
+
+`skills-manager-mcp` keeps `.agents/skills` as its primary store (used by Antigravity and Codex) and **mirrors every installed skill into `.claude/skills`** during `bootstrap`, `sync`, and `install_skills`:
+
+- Each skill is a flat `.claude/skills/<name>/SKILL.md` folder (sub-folders such as `agents/` are copied too).
+- Existing folders in `.claude/skills` are never overwritten, so hand-written skills stay untouched.
+- Folders without a root `SKILL.md` (e.g. category folders) are skipped.
+- Skills with no `description` in their frontmatter are mirrored with a warning, since Claude uses it to decide when to load the skill.
+- `remove_skills` removes both copies; `list_installed_skills` shows whether each skill is available to Claude Code.
+
+Run `skills-manager-mcp sync` once in an existing project to mirror skills that were installed before this feature. Restart the Claude Code session afterwards so it picks up new skills.
+
 ### Project-Level Configuration
 
 Claude Code also supports project-level MCP servers via `.mcp.json` in your project root. This is useful for team-shared MCP configurations:
