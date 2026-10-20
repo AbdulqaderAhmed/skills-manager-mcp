@@ -11,6 +11,8 @@ import { mirrorSkillsToClaude } from './claudeSkills.js';
 
 const execFileAsync = promisify(execFile);
 
+const GIT_ENV = { ...process.env, GIT_TERMINAL_PROMPT: '0', FORCE_COLOR: '0' };
+
 /**
  * Shallow-clones a repository without invoking a shell, so the URL can never be
  * interpreted as shell syntax. `--` stops git from treating the URL as an option.
@@ -18,8 +20,108 @@ const execFileAsync = promisify(execFile);
 export async function gitCloneShallow(repository: string, destDir: string): Promise<void> {
   await execFileAsync('git', ['clone', '--depth', '1', '--quiet', '--', repository, destDir], {
     timeout: 120000,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0', FORCE_COLOR: '0' },
+    env: GIT_ENV,
   });
+}
+
+/**
+ * A repository location, optionally narrowed to a branch/tag and sub-folder.
+ * Skills tools such as `npx skills` record GitHub "tree" URLs like
+ * https://github.com/owner/repo/tree/HEAD/skills/my-skill, which are not cloneable.
+ */
+export interface RepositorySource {
+  cloneUrl: string;
+  ref?: string;
+  subPath?: string;
+}
+
+export function parseRepositorySource(url: string): RepositorySource {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === 'github.com' || parsed.hostname === 'www.github.com') {
+      const match = /^\/([^/]+)\/([^/]+?)(?:\.git)?\/tree\/([^/]+)(?:\/(.+?))?\/?$/.exec(parsed.pathname);
+      if (match) {
+        const ref = decodeURIComponent(match[3]);
+        const subPath = match[4] ? decodeURIComponent(match[4]) : undefined;
+        const safeSubPath =
+          subPath && !subPath.split('/').some((s) => s === '' || s === '.' || s === '..')
+            ? subPath
+            : undefined;
+        return {
+          cloneUrl: `${parsed.protocol}//${parsed.hostname}/${match[1]}/${match[2]}`,
+          ref: ref === 'HEAD' ? undefined : ref,
+          subPath: safeSubPath,
+        };
+      }
+    }
+  } catch {
+    // fall through to the raw URL
+  }
+  return { cloneUrl: url };
+}
+
+/**
+ * Escapes a folder path for use as a gitignore-style sparse-checkout pattern.
+ */
+function toSparsePattern(dir: string): string {
+  return `/${dir.replace(/([\*?[\]])/g, '\$1')}/`;
+}
+
+/**
+ * Clones only the folders that contain a SKILL.md. Large monorepos (e.g. 1+ GB) would
+ * otherwise exceed the clone timeout: this uses a blob-less partial clone, lists the
+ * tree, and checks out just the skill folders. No shell is involved.
+ */
+export async function gitCloneSkillFolders(
+  source: RepositorySource,
+  destDir: string
+): Promise<string[]> {
+  const run = (args: string[], cwd?: string) =>
+    execFileAsync('git', args, {
+      cwd,
+      env: GIT_ENV,
+      timeout: 300000,
+      maxBuffer: 256 * 1024 * 1024,
+    });
+
+  const cloneArgs = ['clone', '--depth', '1', '--quiet', '--filter=blob:none', '--no-checkout'];
+  if (source.ref) cloneArgs.push('--branch', source.ref);
+  cloneArgs.push('--', source.cloneUrl, destDir);
+  await run(cloneArgs);
+
+  const { stdout } = await run(['ls-tree', '-r', '--name-only', '-z', 'HEAD'], destDir);
+  const dirs = new Set<string>();
+  for (const file of stdout.split('\0')) {
+    if (!/(^|\/)skill\.md$/i.test(file)) continue;
+    const parts = file.split('/');
+    if (parts.includes('node_modules')) continue;
+    dirs.add(parts.length === 1 ? '.' : parts.slice(0, -1).join('/'));
+  }
+
+  let wanted = [...dirs];
+  if (source.subPath) {
+    const sub = source.subPath;
+    wanted = wanted.filter((d) => d === sub || d.startsWith(sub + '/'));
+  }
+  if (wanted.length === 0) {
+    throw new Error(
+      source.subPath
+        ? `No SKILL.md found under '${source.subPath}' in '${source.cloneUrl}'.`
+        : `No SKILL.md found in '${source.cloneUrl}'.`
+    );
+  }
+
+  if (!wanted.includes('.')) {
+    await run(['config', 'core.sparseCheckout', 'true'], destDir);
+    await fs.mkdir(path.join(destDir, '.git', 'info'), { recursive: true });
+    await fs.writeFile(
+      path.join(destDir, '.git', 'info', 'sparse-checkout'),
+      wanted.map(toSparsePattern).join('\n') + '\n',
+      'utf-8'
+    );
+  }
+  await run(['read-tree', '-mu', 'HEAD'], destDir);
+  return wanted;
 }
 
 /**
@@ -110,11 +212,13 @@ async function downloadAndExtractSingleSkill(
   logs.push(`[Download Started] Fetching skill '${skillName}' from '${repository}'...`);
 
   try {
-    await gitCloneShallow(repository, tempDir);
+    const source = parseRepositorySource(repository);
+    await gitCloneSkillFolders(source, tempDir);
 
     logs.push(`[Download Completed] Repository downloaded successfully.`);
 
     const searchTargets = [
+      ...(source.subPath ? [path.join(tempDir, source.subPath)] : []),
       path.join(tempDir, 'skills', skillIdentifier),
       path.join(tempDir, 'skills', skillName),
       path.join(tempDir, skillIdentifier),
@@ -195,7 +299,7 @@ async function downloadAndExtractBundle(
   logs.push(`[Download Started] Fetching skill bundle '${bundleName}' from '${repository}'...`);
 
   try {
-    await gitCloneShallow(repository, tempDir);
+    await gitCloneSkillFolders(parseRepositorySource(repository), tempDir);
 
     logs.push(`[Download Completed] Repository bundle downloaded successfully.`);
 

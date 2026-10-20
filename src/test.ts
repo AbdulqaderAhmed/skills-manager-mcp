@@ -1,4 +1,5 @@
 import assert from "node:assert";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -7,6 +8,8 @@ import {
   isValidSkillName,
   discoverSkillFolders,
   gitCloneShallow,
+  gitCloneSkillFolders,
+  parseRepositorySource,
   installSkill,
 } from "./installer.js";
 import { loadSkillsConfig } from "./config.js";
@@ -908,6 +911,52 @@ async function runTests() {
   assert.deepStrictEqual(await listClaudeSkills(ccProject), []);
   await fs.rm(ccProject, { recursive: true, force: true }).catch(() => {});
   console.log("✓ Test 11: Claude Code .claude/skills mirroring passed.");
+
+  // Test 12: GitHub tree URLs and sparse (skill-folders-only) cloning
+  assert.deepStrictEqual(parseRepositorySource("https://github.com/o/r"), { cloneUrl: "https://github.com/o/r" });
+  assert.deepStrictEqual(
+    parseRepositorySource("https://github.com/o/r/tree/HEAD/skills/my-skill"),
+    { cloneUrl: "https://github.com/o/r", ref: undefined, subPath: "skills/my-skill" },
+  );
+  assert.deepStrictEqual(
+    parseRepositorySource("https://github.com/o/r.git/tree/v2/a/b/"),
+    { cloneUrl: "https://github.com/o/r", ref: "v2", subPath: "a/b" },
+  );
+  assert.strictEqual(parseRepositorySource("https://github.com/o/r/tree/main/../x").subPath, undefined);
+
+  const gitEnv = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"];
+  const sparseSrc = await fs.mkdtemp(path.join(os.tmpdir(), "test-sparse-src-"));
+  const sparseDest = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "test-sparse-dst-")), "clone");
+  await fs.mkdir(path.join(sparseSrc, "skills", "alpha", "agents"), { recursive: true });
+  await fs.mkdir(path.join(sparseSrc, "skills", "beta"), { recursive: true });
+  await fs.mkdir(path.join(sparseSrc, "huge"), { recursive: true });
+  await fs.writeFile(path.join(sparseSrc, "skills", "alpha", "SKILL.md"), "---\nname: alpha\n---\n");
+  await fs.writeFile(path.join(sparseSrc, "skills", "alpha", "agents", "x.yaml"), "a: 1");
+  await fs.writeFile(path.join(sparseSrc, "skills", "beta", "SKILL.md"), "---\nname: beta\n---\n");
+  await fs.writeFile(path.join(sparseSrc, "huge", "blob.bin"), "not a skill");
+  execFileSync("git", ["init", "-q"], { cwd: sparseSrc });
+  execFileSync("git", ["add", "-A"], { cwd: sparseSrc });
+  execFileSync("git", [...gitEnv, "commit", "-q", "-m", "init"], { cwd: sparseSrc });
+
+  const sparseDirs = await gitCloneSkillFolders({ cloneUrl: sparseSrc }, sparseDest);
+  assert.deepStrictEqual(sparseDirs.sort(), ["skills/alpha", "skills/beta"]);
+  assert.ok(await fs.stat(path.join(sparseDest, "skills", "alpha", "agents", "x.yaml")).then(() => true, () => false));
+  assert.strictEqual(
+    await fs.stat(path.join(sparseDest, "huge")).then(() => true, () => false),
+    false,
+    "Non-skill folders must not be checked out",
+  );
+
+  const subDest = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "test-sparse-dst-")), "clone");
+  assert.deepStrictEqual(await gitCloneSkillFolders({ cloneUrl: sparseSrc, subPath: "skills/beta" }, subDest), ["skills/beta"]);
+  await assert.rejects(
+    gitCloneSkillFolders({ cloneUrl: sparseSrc, subPath: "skills/gone" }, path.join(path.dirname(subDest), "c2")),
+    /No SKILL\.md found under 'skills\/gone'/,
+  );
+  for (const d of [sparseSrc, path.dirname(sparseDest), path.dirname(subDest)]) {
+    await fs.rm(d, { recursive: true, force: true }).catch(() => {});
+  }
+  console.log("✓ Test 12: GitHub tree URL parsing and sparse skill-folder cloning passed.");
 
   // Restore env vars & cleanup temp dirs
   if (origEnvMcpWorkspace) process.env.MCP_WORKSPACE_DIR = origEnvMcpWorkspace;
