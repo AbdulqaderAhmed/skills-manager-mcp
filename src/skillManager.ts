@@ -8,7 +8,7 @@ import {
   listInstalledSkillFolders,
   removeSkillFolder,
 } from './filesystem.js';
-import { installSkill } from './installer.js';
+import { installSkill, isValidSkillName } from './installer.js';
 import { Tracker } from './tracker.js';
 import { CacheManager } from './cacheManager.js';
 import {
@@ -401,12 +401,20 @@ export class SkillManager {
       if (!name) continue;
 
       try {
+        if (!isValidSkillName(name)) {
+          throw new Error(
+            'Invalid name. Must contain only letters, numbers, hyphens, and underscores.'
+          );
+        }
+
         let wasRemoved = false;
-        const trackedMetadata = tracker.skills[name];
+        const trackedMetadata = Object.prototype.hasOwnProperty.call(tracker.skills, name)
+          ? tracker.skills[name]
+          : undefined;
 
         if (trackedMetadata && trackedMetadata.type === 'bundle') {
           // Bundle removal: remove all sub-skills associated with this bundle
-          const subSkills = trackedMetadata.installedSkills || [];
+          const subSkills = (trackedMetadata.installedSkills || []).filter(isValidSkillName);
           for (const subSkill of subSkills) {
             await removeSkillFolder(targetDir, subSkill);
           }

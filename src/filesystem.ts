@@ -109,6 +109,13 @@ export async function removeSkillFolder(
   projectPath: string,
   skillName: string
 ): Promise<boolean> {
+  const skillsDir = path.resolve(projectPath, '.agents', 'skills');
+  const target = path.resolve(skillsDir, skillName);
+  // Refuse anything that is not strictly inside .agents/skills (e.g. '..', '.', absolute paths)
+  if (!target.startsWith(skillsDir + path.sep)) {
+    throw new Error(`Refusing to remove '${skillName}': path escapes the skills directory.`);
+  }
+
   const { exists, skillPath } = await checkSkillExists(projectPath, skillName);
   if (!exists) {
     return false;

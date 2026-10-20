@@ -6,6 +6,8 @@ import {
   isValidRepositoryUrl,
   isValidSkillName,
   discoverSkillFolders,
+  gitCloneShallow,
+  installSkill,
 } from "./installer.js";
 import { loadSkillsConfig } from "./config.js";
 import { CacheManager } from "./cacheManager.js";
@@ -772,6 +774,86 @@ async function runTests() {
   assert.strictEqual(typeof fs.cp, "function");
   assert.strictEqual(typeof fs.rm, "function");
   console.log("✓ Test 9D: Required fs APIs (cp, rm) are available.");
+
+  // Test 10A: remove_skills rejects path-traversal names and never deletes outside .agents/skills
+  const traversalProject = await fs.mkdtemp(path.join(os.tmpdir(), "test-traversal-"));
+  const traversalSkillsDir = path.join(traversalProject, ".agents", "skills");
+  await fs.mkdir(path.join(traversalSkillsDir, "legit-skill"), { recursive: true });
+  await fs.writeFile(path.join(traversalProject, "important.txt"), "keep me", "utf-8");
+
+  const traversalReport = await SkillManager.removeSkills(
+    ["..", ".", "../..", "../legit-skill", "a/../..", path.resolve(traversalProject)],
+    false,
+    traversalProject,
+  );
+  assert.strictEqual(traversalReport.removed.length, 0);
+  assert.strictEqual(traversalReport.failed.length, 6);
+  assert.ok(
+    await fs.stat(path.join(traversalProject, "important.txt")).then(() => true, () => false),
+    "Project files must survive traversal removal attempts",
+  );
+  assert.ok(
+    await fs.stat(path.join(traversalSkillsDir, "legit-skill")).then(() => true, () => false),
+    "Skills must survive traversal removal attempts",
+  );
+
+  // Tampered tracker: a bundle listing '..' as a sub-skill must not escape either
+  await fs.writeFile(
+    Tracker.getTrackerPath(traversalProject),
+    JSON.stringify({
+      version: "1.6.0",
+      updatedAt: "2026-01-01",
+      migrations: {},
+      skills: {
+        evil: { type: "bundle", source: "https://example.com/x", installedAt: "2026-01-01", version: "latest", installedSkills: ["..", "../.."] },
+      },
+    }),
+    "utf-8",
+  );
+  await SkillManager.removeSkills(["evil"], false, traversalProject);
+  assert.ok(
+    await fs.stat(path.join(traversalProject, "important.txt")).then(() => true, () => false),
+    "Project files must survive tampered tracker bundle removal",
+  );
+
+  // Legitimate removal still works
+  const legitReport = await SkillManager.removeSkills(["legit-skill"], false, traversalProject);
+  assert.deepStrictEqual(legitReport.removed, ["legit-skill"]);
+  await fs.rm(traversalProject, { recursive: true, force: true }).catch(() => {});
+  console.log("✓ Test 10A: remove_skills path traversal protection passed.");
+
+  // Test 10B: git clone is not shell-interpreted (command injection) and bad identifiers are rejected
+  const injectionDir = await fs.mkdtemp(path.join(os.tmpdir(), "test-injection-"));
+  const markerPath = path.join(injectionDir, "pwned");
+  const markerPath2 = path.join(injectionDir, "pwned2");
+  for (const payload of [
+    `https://127.0.0.1:1/$(touch ${markerPath})`,
+    `https://127.0.0.1:1/\`touch ${markerPath2}\``,
+    `https://127.0.0.1:1/"; touch ${markerPath}; echo "`,
+  ]) {
+    await assert.rejects(gitCloneShallow(payload, path.join(injectionDir, "clone")));
+  }
+  assert.strictEqual(
+    await fs.stat(markerPath).then(() => true, () => false),
+    false,
+    "Shell command substitution in repository URL must not execute",
+  );
+  assert.strictEqual(
+    await fs.stat(markerPath2).then(() => true, () => false),
+    false,
+    "Backtick substitution in repository URL must not execute",
+  );
+
+  const badIdentifierResult = await installSkill(injectionDir, {
+    type: "skill",
+    name: "ok-name",
+    repository: "https://127.0.0.1:1/repo",
+    skill: "../../escape",
+  });
+  assert.strictEqual(badIdentifierResult.status, "failed");
+  assert.ok(badIdentifierResult.message.includes("Invalid skill identifier"));
+  await fs.rm(injectionDir, { recursive: true, force: true }).catch(() => {});
+  console.log("✓ Test 10B: git clone command injection protection passed.");
 
   // Restore env vars & cleanup temp dirs
   if (origEnvMcpWorkspace) process.env.MCP_WORKSPACE_DIR = origEnvMcpWorkspace;

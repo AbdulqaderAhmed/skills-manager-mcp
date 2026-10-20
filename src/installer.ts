@@ -1,4 +1,4 @@
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -8,7 +8,18 @@ import { checkSkillExists, ensureSkillsDirectory, isDirectory } from './filesyst
 import { CacheManager } from './cacheManager.js';
 import { Tracker } from './tracker.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+/**
+ * Shallow-clones a repository without invoking a shell, so the URL can never be
+ * interpreted as shell syntax. `--` stops git from treating the URL as an option.
+ */
+export async function gitCloneShallow(repository: string, destDir: string): Promise<void> {
+  await execFileAsync('git', ['clone', '--depth', '1', '--quiet', '--', repository, destDir], {
+    timeout: 120000,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0', FORCE_COLOR: '0' },
+  });
+}
 
 /**
  * Validates a repository URL to prevent shell injection / illegal protocols.
@@ -98,11 +109,7 @@ async function downloadAndExtractSingleSkill(
   logs.push(`[Download Started] Fetching skill '${skillName}' from '${repository}'...`);
 
   try {
-    const cloneCmd = `git clone --depth 1 --quiet "${repository}" "${tempDir}"`;
-    await execAsync(cloneCmd, {
-      timeout: 120000,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0', FORCE_COLOR: '0' },
-    });
+    await gitCloneShallow(repository, tempDir);
 
     logs.push(`[Download Completed] Repository downloaded successfully.`);
 
@@ -187,11 +194,7 @@ async function downloadAndExtractBundle(
   logs.push(`[Download Started] Fetching skill bundle '${bundleName}' from '${repository}'...`);
 
   try {
-    const cloneCmd = `git clone --depth 1 --quiet "${repository}" "${tempDir}"`;
-    await execAsync(cloneCmd, {
-      timeout: 120000,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0', FORCE_COLOR: '0' },
-    });
+    await gitCloneShallow(repository, tempDir);
 
     logs.push(`[Download Completed] Repository bundle downloaded successfully.`);
 
@@ -246,6 +249,18 @@ export async function installSkill(
   // Security checks
   if (!isValidRepositoryUrl(repository)) {
     const errorMsg = `Invalid repository URL format: '${repository}'. Must be a valid HTTP/HTTPS URL.`;
+    logs.push(`[Failure Reason] ${errorMsg}`);
+    return {
+      skillName: name,
+      type: entryType,
+      status: 'failed',
+      message: logs.join('\n'),
+    };
+  }
+
+  const skillIdentifierRaw = (skillConfig as any).skill;
+  if (skillIdentifierRaw !== undefined && !isValidSkillName(String(skillIdentifierRaw))) {
+    const errorMsg = `Invalid skill identifier: '${skillIdentifierRaw}'. Must contain only letters, numbers, hyphens, and underscores.`;
     logs.push(`[Failure Reason] ${errorMsg}`);
     return {
       skillName: name,
