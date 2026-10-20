@@ -5,6 +5,14 @@ All notable changes to the `skills-manager-mcp` project will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.2] - 2026-10-20
+
+### Fixed
+- Skill downloads now retry up to 5 times on transient network/DNS failures instead of failing the install.
+- Sparse-checkout patterns now escape glob characters (`[`, `]`, `*`, `?`) in skill folder names.
+
+---
+
 ## [1.13.1] - 2026-10-20
 
 ### Fixed
